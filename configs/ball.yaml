@@ -1,0 +1,7 @@
+# Ball pass. Keys are filled in during Phase 3.
+detector:
+  conf: 0.1
+  min_area: 20
+  max_area: 2500
+  min_ratio: 0.6
+  max_ratio: 1.4

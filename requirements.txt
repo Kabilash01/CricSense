@@ -1,0 +1,6 @@
+# Full install for every pass. Core-only alternative: pip install -e ".[dev]"
+#
+# The RTX 50-series (Blackwell) needs CUDA 12.8 builds of torch, hence the extra index.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+-e .[ml,ocr,render,dev]

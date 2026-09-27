@@ -1,0 +1,5 @@
+# Players pass. Keys are filled in during Phase 2.
+detector:
+  conf: 0.3
+tracker:
+  config: configs/bytetrack.yaml

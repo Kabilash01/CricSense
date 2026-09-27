@@ -1,0 +1,29 @@
+# Paths are relative to the repo root. Nothing in src/ hardcodes a path.
+device: cuda:0
+
+paths:
+  player_weights: models/yolov8m_production4.pt
+  ball_weights: models/ball_stump_best.pt
+  video_dir: data
+  output_dir: outputs
+  calibration_dir: configs/calibration
+
+video:
+  # null keeps native resolution. Calibration is done in the same coordinates the passes use,
+  # so changing this after calibrating invalidates configs/calibration/<video_id>.yaml.
+  resize: null
+
+# Carrying the calibration from its reference frame to every other frame.
+# The broadcast camera pans and zooms through each delivery (measured: up to ~260 px and
+# ~30% zoom within 2 s), so a single homography per video is not enough.
+camera:
+  match_scale: 1.0        # < 1 finds features on a downscaled copy: faster, less precise
+  orb_features: 3000
+  ransac_px: 3.0          # RANSAC inlier threshold, in pixels of the (downscaled) frame
+  min_inliers: 80         # below this a frame is treated as not showing a calibrated view
+  max_chain_frames: 25    # frames tracked via the previous frame before a direct match is required
+  # Broadcast graphics stay fixed on screen while the camera moves; matching on them would
+  # drag the estimate toward "no motion". Rectangles as [x0, y0, x1, y1] fractions of the frame.
+  overlay_mask:
+    - [0.0, 0.0, 0.14, 0.23]   # tournament logo incl. the "FINAL 2024" text, top left
+    - [0.0, 0.85, 1.0, 1.0]    # score bar

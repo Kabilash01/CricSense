@@ -1,0 +1,20 @@
+tracker_type: bytetrack
+
+# High confidence threshold for tracking
+track_high_thresh: 0.4
+
+# Low confidence threshold (keeps tracks during occlusion)
+track_low_thresh: 0.1
+
+# Threshold to start a new track
+new_track_thresh: 0.5
+
+# How many frames to keep "lost" tracks alive
+# 60 frames ≈ 2 seconds at 30 FPS
+track_buffer: 60
+
+# Matching threshold (higher = fewer ID switches)
+match_thresh: 0.9
+
+# Fuse detection confidence with IoU for matching
+fuse_score: True

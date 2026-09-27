@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Weights, video and generated output never enter version control
+models/
+data/
+outputs/
+jersey_crops/
+*.pt
+*.pth
+*.engine
+*.onnx
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Read-only source repos being migrated, and the raw match broadcasts (GBs)
+_src_ai/
+_src_ball/
+Cricket match/
+
+# Local tooling
+logs/
+.claude/settings.local.json
+CLAUDE.local.md
