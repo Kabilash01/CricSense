@@ -41,7 +41,6 @@ class ScoreboardLayout:
     icon_hue: tuple[int, int]
     icon_min_fraction: float
     sample_every: int
-    squad_names: tuple[str, ...]
 
     @classmethod
     def from_yaml(cls, path: Path) -> ScoreboardLayout:
@@ -58,7 +57,6 @@ class ScoreboardLayout:
             icon_hue=tuple(icon["hue"]),
             icon_min_fraction=float(icon["min_fraction"]),
             sample_every=int(raw.get("sample_every", 12)),
-            squad_names=tuple(n for names in (raw.get("squads") or {}).values() for n in names),
         )
 
 
@@ -122,8 +120,9 @@ class ScoreboardReader:
     The bar changes a few times per delivery, so this skips almost all OCR calls.
     """
 
-    def __init__(self, layout: ScoreboardLayout) -> None:
+    def __init__(self, layout: ScoreboardLayout, squad_names: tuple[str, ...] = ()) -> None:
         self.layout = layout
+        self.squad_names = squad_names  # names as the bar prints them, to snap OCR slips to
         self._cache: dict[str, tuple[np.ndarray, str]] = {}
         self.ocr_calls = 0
 
@@ -145,7 +144,7 @@ class ScoreboardReader:
             return None
         raw = {name: self._ocr(image, rect, name) for name, rect in self.layout.fields.items()}
         striker = self.striker_index(image)
-        squad = self.layout.squad_names
+        squad = self.squad_names
         batters = [
             BatterLine(
                 name=clean_name(raw[f"batter{i}_name"], squad),

@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from cricsense.config import Config, video_id_from_path
+from cricsense.identity.match_sheet import MatchSheet
 from cricsense.identity.scoreboard_ocr import ScoreboardLayout, ScoreboardReader
 from cricsense.io import VideoReader, write_doc
 from cricsense.schema import RunInfo, ScoreboardDoc
@@ -16,7 +17,9 @@ log = logging.getLogger("cricsense.scoreboard")
 
 def run_scoreboard(cfg: Config, video: Path, layout_path: Path | None = None) -> tuple[ScoreboardDoc, Path]:
     layout = ScoreboardLayout.from_yaml(layout_path or cfg.root / "configs" / "scoreboard.yaml")
-    reader = ScoreboardReader(layout)
+    sheet_path = cfg.root / "configs" / "match.yaml"
+    squad = MatchSheet.from_yaml(sheet_path).all_names if sheet_path.is_file() else ()
+    reader = ScoreboardReader(layout, squad)
     video_id = video_id_from_path(video)
     readings = []
     t0 = time.perf_counter()

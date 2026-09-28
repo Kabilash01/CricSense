@@ -1,0 +1,13 @@
+# Match sheet: facts about the match that the video cannot show reliably.
+# ICC Men's T20 World Cup 2024 final, South Africa v India, Kensington Oval, Barbados, 29 June 2024.
+#
+# Names are spelled as the broadcast score bar prints them: they snap OCR slips to real
+# names and decide which team is batting. The keeper is named from here, because the score
+# bar never shows the keeper; check it against the team sheet for any other match.
+teams:
+  IND:
+    squad: [ROHIT, KOHLI, PANT, SURYAKUMAR, DUBE, HARDIK, JADEJA, AXAR, KULDEEP, BUMRAH, ARSHDEEP]
+    keeper: PANT
+  SA:
+    squad: [DE KOCK, HENDRICKS, MARKRAM, STUBBS, KLAASEN, MILLER, JANSEN, MAHARAJ, RABADA, NORTJE, SHAMSI]
+    keeper: DE KOCK

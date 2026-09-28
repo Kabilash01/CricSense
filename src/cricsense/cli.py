@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -71,6 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     pl = add("players", "GPU pass: player tracks, stable IDs, roles, identities -> players.json", _players, video=True)
     pl.add_argument("--tracker", type=Path, help="tracker config (default: configs/players.yaml tracker.config)")
     pl.add_argument("--out-name", default="players.json", help="output file name inside outputs/<video_id>/")
+    pl.add_argument("--device", help="override configs/default.yaml device, e.g. cpu or cuda:0")
     add("ball", "GPU pass: ball trajectory, bounce, line and length -> ball.json", video=True)
     add("fuse", "CPU pass: contact, boundary and wicket events -> events.json", video_id=True)
     add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", video_id=True)
@@ -121,7 +123,10 @@ def _players(args: argparse.Namespace) -> int:
     from cricsense.passes.players import run_players, summarize
 
     setup_logging()
-    print("\n".join(summarize(run_players(load_config(), args.video, args.tracker, args.out_name))))
+    cfg = load_config()
+    if args.device:
+        cfg = dataclasses.replace(cfg, device=args.device)
+    print("\n".join(summarize(run_players(cfg, args.video, args.tracker, args.out_name))))
     return 0
 
 

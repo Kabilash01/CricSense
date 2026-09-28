@@ -40,3 +40,40 @@ def test_tracker_handover_is_merged_into_the_original_id():
     assert merges == {6: 3}
     assert {f.sid for f in frames} == {3, 7}
     assert len([f for f in frames if f.sid == 3]) == 20  # frames 0-19, one box per frame
+
+
+def test_teams_and_keeper_name_from_the_match_sheet(tmp_path):
+    from cricsense.identity.match_sheet import MatchSheet
+    from cricsense.passes.players import assign_teams
+    from cricsense.schema import PlayerFrame
+
+    sheet_file = tmp_path / "match.yaml"
+    sheet_file.write_text(
+        "teams:\n  IND: {squad: [KOHLI, AXAR, PANT], keeper: PANT}\n  SA: {squad: [DE KOCK, SHAMSI], keeper: DE KOCK}\n"
+    )
+    sheet = MatchSheet.from_yaml(sheet_file)
+
+    def pf(sid, role, name=None):
+        return PlayerFrame(
+            frame_id=0, t=0.0, sid=sid, box=(0, 0, 10, 20), role=role, identity=name,
+            identity_source="scoreboard" if name else None,
+        )
+
+    frames = [
+        pf(1, Role.STRIKER, "KOHLI"), pf(2, Role.NON_STRIKER, "AXAR"), pf(3, Role.BOWLER, "SHAMSI"),
+        pf(4, Role.KEEPER), pf(5, Role.UMPIRE), pf(6, Role.FIELDER),
+    ]
+    out = {f.sid: f for f in assign_teams(frames, sheet, {s: 0 for s in range(1, 7)}, {4: 0.97})}
+    assert [out[s].team for s in range(1, 7)] == ["IND", "IND", "SA", "SA", None, "SA"]
+    assert (out[4].identity, out[4].identity_source, out[4].identity_conf) == ("DE KOCK", "match_sheet", 0.97)
+
+
+def test_match_sheet_rejects_a_keeper_outside_the_squad(tmp_path):
+    import pytest
+
+    from cricsense.identity.match_sheet import MatchSheet
+
+    f = tmp_path / "match.yaml"
+    f.write_text("teams:\n  A: {squad: [X], keeper: Y}\n  B: {squad: [Z]}\n")
+    with pytest.raises(ValueError, match="not in the squad"):
+        MatchSheet.from_yaml(f)

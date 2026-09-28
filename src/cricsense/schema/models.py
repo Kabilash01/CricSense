@@ -57,8 +57,12 @@ class PlayerFrame(_Strict):
     box: tuple[int, int, int, int]  # x1, y1, x2, y2 in image pixels
     role: Role  # from pitch geometry, never from the detector class
     pitch_xy: tuple[float, float] | None = None  # foot point in metres; None if uncalibrated
-    identity: str | None = None  # from the scoreboard, else None
+    identity: str | None = None  # name, where one is known
     identity_conf: float = Field(default=0.0, ge=0.0, le=1.0)
+    # "scoreboard": read off the broadcast bar (striker, non-striker, bowler);
+    # "match_sheet": the fielding side's keeper from configs/match.yaml
+    identity_source: Literal["scoreboard", "match_sheet"] | None = None
+    team: str | None = None  # batting side for batters, fielding side for the rest; None for umpires
 
     @field_validator("box")
     @classmethod

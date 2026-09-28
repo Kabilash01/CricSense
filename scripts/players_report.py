@@ -2,7 +2,8 @@
 
     python scripts/players_report.py outputs/final_0051_6min/players.json
 
-A shot is a run of processed frames between camera cuts. In a shot from the main camera
+Names marked * come from the match sheet (the keeper), the rest from the score bar;
+[TEAM] is the side the player is on. A shot is a run of processed frames between camera cuts. In a shot from the main camera
 the expected cast is one striker, one non-striker, one bowler, at most one keeper and one
 umpire; anything else is a fielder. The summary counts shots that break that.
 """
@@ -51,6 +52,8 @@ def main(path: str) -> int:
             xs = [f.pitch_xy[0] for f in fs if f.pitch_xy]
             where = f"x{sum(xs) / len(xs):.0f}" if xs else "x?"
             name = f"/{fs[0].identity}" if fs[0].identity else ""
+            name += f"[{fs[0].team}]" if fs[0].team else ""
+            name += "*" if fs[0].identity_source == "match_sheet" else ""
             parts.append(f"{role}{name}@{where}({100 * n / len(fs):.0f}%)")
         issues = [f"2x {r}" for r in UNIQUE if dominant[r] > 1]
         issues += [f"no {r}" for r in ("striker", "non_striker", "bowler") if dominant[r] == 0]

@@ -18,6 +18,7 @@ import numpy as np
 from ultralytics import YOLO
 
 from cricsense.config import Config, video_id_from_path
+from cricsense.identity.match_sheet import MatchSheet
 from cricsense.identity.registry import Detection, PlayerRegistry, RegistryOptions
 from cricsense.identity.role_assigner import RoleAssigner, RoleOptions
 from cricsense.io import VideoReader, read_doc, write_doc
@@ -63,6 +64,9 @@ class IdentityVoter:
         if name:
             self._votes[sid][name] += 1
 
+    def shot_of(self, sid: int) -> int | None:
+        return self._shot.get(sid)
+
     def merge(self, old: int, new: int) -> None:
         """Fold `new`'s votes into `old` (the same person, split by a tracker handover)."""
         self._votes[old].update(self._votes.pop(new, Counter()))
@@ -106,6 +110,45 @@ def _feet_visible(box: np.ndarray, frame_size: tuple[int, int], occluders: list[
         if x0 * w <= x <= x1 * w and bottom >= y0 * h - _EDGE_PX:
             return False
     return True
+
+
+def assign_teams(
+    frames: list[PlayerFrame], sheet: MatchSheet, shot_of: dict[int, int], keeper_share: dict[int, float]
+) -> list[PlayerFrame]:
+    """Team for everyone and the keeper's name, per shot.
+
+    The batting side is the team whose squad the named batters belong to (else the team
+    the bowler does not belong to). Batters take the batting side; bowler, keeper and
+    fielders the other; umpires none. The keeper is named from the match sheet, because
+    the score bar never shows him.
+    """
+    votes: dict[int, Counter] = defaultdict(Counter)  # shot -> batting-team votes
+    for f in frames:
+        team = sheet.team_of(f.identity)
+        if team is None or f.identity_source != "scoreboard":
+            continue
+        batting = team if f.role in (Role.STRIKER, Role.NON_STRIKER) else sheet.other(team)
+        votes[shot_of[f.sid]][batting.code] += 1
+    batting_of = {shot: v.most_common(1)[0][0] for shot, v in votes.items()}
+    teams = {t.code: t for t in sheet.teams}
+
+    out = []
+    for f in frames:
+        code = batting_of.get(shot_of.get(f.sid))
+        if code is None or f.role == Role.UMPIRE:
+            out.append(f)
+            continue
+        batting = teams[code]
+        fielding = sheet.other(batting)
+        update: dict = {"team": batting.code if f.role in (Role.STRIKER, Role.NON_STRIKER) else fielding.code}
+        if f.role == Role.KEEPER and f.identity is None and fielding.keeper:
+            update |= {
+                "identity": fielding.keeper,
+                "identity_source": "match_sheet",
+                "identity_conf": round(keeper_share.get(f.sid, 0.0), 3),
+            }
+        out.append(f.model_copy(update=update))
+    return out
 
 
 _HANDOVER_MAX_OVERLAP = 5  # frames an old and a new track of one person may coexist
@@ -308,10 +351,19 @@ def run_players(cfg: Config, video: Path, tracker_yaml: Path | None = None, out_
     frames_out = [
         f.model_copy(
             update={"role": dominant[f.sid]}
-            | ({"identity": names[f.sid][0], "identity_conf": names[f.sid][1]} if f.sid in names else {})
+            | (
+                {"identity": names[f.sid][0], "identity_conf": names[f.sid][1], "identity_source": "scoreboard"}
+                if f.sid in names
+                else {}
+            )
         )
         for f in frames_out
     ]
+    sheet_path = cfg.root / "configs" / "match.yaml"
+    if sheet_path.is_file():
+        keeper_share = {sid: v[Role.KEEPER] / sum(v.values()) for sid, v in role_votes.items()}
+        shot_of = {sid: voter.shot_of(sid) for sid in role_votes}
+        frames_out = assign_teams(frames_out, MatchSheet.from_yaml(sheet_path), shot_of, keeper_share)
     run = RunInfo(wall_time_s=time.perf_counter() - t0, frames_processed=processed, device=cfg.device)
     doc = PlayersDoc(video=meta, run=run, frames=frames_out)
     path = write_doc(doc, out_dir / out_name)

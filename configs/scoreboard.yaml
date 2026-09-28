@@ -33,7 +33,4 @@ striker_icon:
 
 sample_every: 12             # frames between reads (0.5 s at 25 fps); the bar changes slowly
 
-# Optional: names as the broadcast spells them, for correcting OCR slips.
-squads:
-  IND: [ROHIT, KOHLI, PANT, SURYAKUMAR, DUBE, HARDIK, JADEJA, AXAR, KULDEEP, BUMRAH, ARSHDEEP]
-  SA: [DE KOCK, HENDRICKS, MARKRAM, STUBBS, KLAASEN, MILLER, JANSEN, MAHARAJ, RABADA, NORTJE, SHAMSI]
+# Squads for snapping OCR slips to real names live in configs/match.yaml.
