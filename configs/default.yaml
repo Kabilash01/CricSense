@@ -3,7 +3,7 @@ device: cuda:0
 
 paths:
   player_weights: models/yolov8m_production4.pt
-  ball_weights: models/ball_stump_best.pt
+  ball_weights: models/ball_best.pt  # YOLOv8l @1280 (ball-tracking repo, ball_test/weights/best.pt)
   video_dir: data
   output_dir: outputs
   calibration_dir: configs/calibration

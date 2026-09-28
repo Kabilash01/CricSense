@@ -29,3 +29,6 @@ Cricket match/
 logs/
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Secrets (Roboflow API key)
+.env

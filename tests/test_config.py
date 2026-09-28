@@ -46,7 +46,8 @@ def test_bad_resize(tmp_path):
 
 def test_missing_path_key(tmp_path):
     default = _copy_configs(tmp_path) / "default.yaml"
-    default.write_text(default.read_text().replace("  ball_weights: models/ball_stump_best.pt\n", ""))
+    lines = default.read_text().splitlines(keepends=True)
+    default.write_text("".join(line for line in lines if not line.lstrip().startswith("ball_weights:")))
     with pytest.raises(ConfigError, match="paths.ball_weights"):
         load_config(tmp_path)
 
