@@ -228,12 +228,30 @@ def read_frames(path: Path, frame_ids: Iterable[int], resize: tuple[int, int] | 
     return found
 
 
+def reference_images(
+    path: Path, calibration: CalibrationDoc, root: Path, resize: tuple[int, int] | None = None
+) -> dict[str, np.ndarray]:
+    """Each view's reference frame, read from the view's own source video where it has one."""
+    by_source: dict[Path, list] = {}
+    for v in calibration.views:
+        source = path if v.source_video is None else (root / v.source_video)
+        by_source.setdefault(source, []).append(v)
+    images: dict[str, np.ndarray] = {}
+    for source, views in by_source.items():
+        if not source.is_file():
+            raise ValueError(f"reference video {source} for views {[v.name for v in views]} not found")
+        frames = read_frames(source, (v.frame_id for v in views), resize)
+        images |= {v.name: frames[v.frame_id] for v in views}
+    return images
+
+
 def track_video(
     path: Path,
     video: VideoMeta,
     calibration: CalibrationDoc,
     opts: CameraOptions,
     resize: tuple[int, int] | None = None,
+    root: Path | None = None,
 ) -> CameraDoc:
     """A CameraFrame for every frame of the video."""
     if (video.width, video.height) != tuple(calibration.image_size):
@@ -241,9 +259,9 @@ def track_video(
             f"calibration was clicked at {calibration.image_size} but frames are "
             f"{video.width}x{video.height}; recalibrate after changing video.resize"
         )
-    ref_images = read_frames(path, (v.frame_id for v in calibration.views), resize)
+    ref_images = reference_images(path, calibration, root or Path.cwd(), resize)
     tracker = CameraTracker(
-        {v.name: (ref_images[v.frame_id], PitchHomography(np.array(v.image_to_pitch))) for v in calibration.views},
+        {v.name: (ref_images[v.name], PitchHomography(np.array(v.image_to_pitch))) for v in calibration.views},
         opts,
     )
     raw: list[tuple[int, float, CameraEstimate]] = []

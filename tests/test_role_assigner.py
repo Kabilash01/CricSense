@@ -76,3 +76,16 @@ def test_moving_bowler_and_still_umpire_are_told_apart():
         umpire = (22.0 + rng.normal(0, 0.15), 0.0 + rng.normal(0, 0.15))  # still, noisy position
         roles = ra.update({1: (bowler, None, 0.0), 2: (umpire, None, 0.0)})
     assert roles == {1: Role.BOWLER, 2: Role.UMPIRE}
+
+
+def test_keeper_standing_back_to_pace_among_slips():
+    # Pace bowling: keeper ~17 m behind the stumps on the middle line, two slips beside him.
+    ra = RoleAssigner()
+    for _ in range(30):
+        roles = ra.update({
+            1: ((1.8, 0.2), None, 0.0),     # striker
+            2: ((-17.5, 0.1), None, 0.0),   # keeper
+            3: ((-17.0, 2.2), None, 0.0),   # first slip
+            4: ((-16.2, 4.1), None, 0.0),   # second slip
+        })
+    assert roles == {1: Role.STRIKER, 2: Role.KEEPER, 3: Role.FIELDER, 4: Role.FIELDER}

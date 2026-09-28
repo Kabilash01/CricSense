@@ -210,6 +210,9 @@ class ReferenceView(_Strict):
     """One camera view, calibrated by clicking landmarks on one of its frames."""
 
     name: str = Field(min_length=1)
+    # The video `frame_id` belongs to, relative to the repo root. Broadcast cameras stay put
+    # for a whole match, so one clicked view serves every clip of it. None: this video.
+    source_video: str | None = None
     frame_id: NonNegativeInt
     image_to_pitch: Matrix3
     fit_points: list[LandmarkObservation] = Field(min_length=4)

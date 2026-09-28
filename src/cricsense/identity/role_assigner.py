@@ -45,14 +45,16 @@ def geometry_evidence(x: float, y: float) -> dict[Role, float]:
     evidence = {
         # at the striker's popping crease, level with the stumps
         Role.STRIKER: _gauss(x, pm.STRIKER_POPPING_X, 1.2) * _gauss(ay, 0.3, 0.9),
-        # behind the striker's stumps
-        Role.KEEPER: _gauss(x, -2.5, 1.8) * _gauss(ay, 0.3, 1.5),
+        # behind the striker's stumps: standing up to spin (~1.5 m back) or back to pace
+        # (~15-20 m back, among the slips; the keeper is the one nearest the middle line)
+        Role.KEEPER: max(_gauss(x, -1.5, 1.5), _gauss(x, -16.0, 5.0)) * _gauss(ay, 0.0, 1.2),
         # beside the bowler's-end crease, off the middle line
         Role.NON_STRIKER: _gauss(x, pm.BOWLER_POPPING_X - 0.5, 1.2) * _gauss(ay, 1.6, 0.8),
-        # on the pitch near the bowler's end, or in the run-up beyond it
-        Role.BOWLER: max(_gauss(x, pm.BOWLER_POPPING_X, 2.0), _gauss(x, 28.0, 7.0)) * _gauss(ay, 0.6, 1.2),
-        # just behind the bowler's stumps, on the middle line
-        Role.UMPIRE: _gauss(x, pm.BOWLER_STUMPS_X + 1.8, 1.0) * _gauss(ay, 0.0, 0.8),
+        # at the bowler's crease (delivery stride and follow-through); the run-up beyond it only
+        # counts when the player is actually running (motion_evidence), since the umpire stands there
+        Role.BOWLER: _gauss(x, pm.BOWLER_POPPING_X, 2.0) * _gauss(ay, 0.6, 1.2),
+        # 1-5 m behind the bowler's stumps, on the middle line (measured: 21-23 m and 24.5 m)
+        Role.UMPIRE: _gauss(x, pm.BOWLER_STUMPS_X + 3.0, 1.8) * _gauss(ay, 0.0, 0.8),
     }
     # anyone else on the field; weak everywhere so a good positional fit wins
     evidence[Role.FIELDER] = 0.25
@@ -74,7 +76,8 @@ def motion_evidence(x: float, speed_mps: float) -> dict[Role, float]:
     cannot separate them (both stand around x = 20-25 m), movement can."""
     if x < pm.BOWLER_POPPING_X - 4.0:
         return {}
-    moving = float(np.clip(speed_mps / 3.0, 0.0, 1.0))
+    # below ~1 m/s is standing still: measurement noise and the odd shuffle
+    moving = float(np.clip((speed_mps - 1.0) / 3.0, 0.0, 1.0))
     return {Role.BOWLER: moving, Role.UMPIRE: -moving}
 
 

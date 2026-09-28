@@ -65,6 +65,23 @@ class PlayerRegistry:
     def n_players(self) -> int:
         return self._next_sid - 1
 
+    def camera_moved(self, prev_to_cur: np.ndarray) -> None:
+        """Warp remembered image boxes by the camera's own motion (3x3, previous -> current pixels).
+
+        Without this, a fast zoom makes a player's new box overlap nothing they left behind,
+        so a track the tracker loses during the zoom cannot be re-linked in image space.
+        """
+        for player in self._players.values():
+            x1, y1, x2, y2 = player.box
+            corners = np.array([[x1, y1, 1.0], [x2, y1, 1.0], [x1, y2, 1.0], [x2, y2, 1.0]]) @ prev_to_cur.T
+            corners = corners[:, :2] / corners[:, 2:3]
+            player.box = (
+                float(corners[:, 0].min()),
+                float(corners[:, 1].min()),
+                float(corners[:, 0].max()),
+                float(corners[:, 1].max()),
+            )
+
     def camera_cut(self) -> None:
         """Call when the view changes; image positions before and after are unrelated."""
         self._segment += 1

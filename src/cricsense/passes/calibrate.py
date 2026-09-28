@@ -102,6 +102,7 @@ def run_calibrate(
     force: bool = False,
     propagate: bool = True,
     propagate_only: bool = False,
+    import_views: Path | None = None,
 ) -> CalibrateResult:
     video_id = video_id_from_path(video)
     resize = cfg.video.resize
@@ -116,6 +117,10 @@ def run_calibrate(
         if existing is None:
             raise CalibrationError(f"{cal_path} does not exist; calibrate a reference view first")
         calibration = existing
+    elif import_views is not None:
+        calibration = _import_views(cfg, import_views, existing, video_id, (meta.width, meta.height), force)
+        write_yaml_doc(calibration, cal_path)
+        log.info("wrote %s with %d views", cal_path, len(calibration.views))
     else:
         if existing is not None and not force and any(v.name == view_name for v in existing.views):
             raise CalibrationError(f"view {view_name!r} already exists in {cal_path}; pass --force to replace it")
@@ -130,7 +135,9 @@ def run_calibrate(
             frame_id, session = picked.frame_id, picked.session
         else:
             session = session_from_points(points)
-        view = build_view(view_name, frame_id, session)
+        view = build_view(view_name, frame_id, session).model_copy(
+            update={"source_video": _repo_relative(cfg, video)}
+        )
 
         other_views = [v for v in existing.views if v.name != view_name] if existing else []
         calibration = CalibrationDoc(
@@ -147,10 +154,46 @@ def run_calibrate(
 
     camera = camera_path = None
     if propagate or propagate_only:
-        camera = track_video(video, meta, calibration, cfg.camera, resize)
+        camera = track_video(video, meta, calibration, cfg.camera, resize, root=cfg.root)
         camera_path = write_doc(camera, out_dir / "camera.json")
         log.info("wrote %s", camera_path)
     return CalibrateResult(cal_path, check_path, camera_path, view, camera)
+
+
+def _repo_relative(cfg: Config, video: Path) -> str:
+    path = video.resolve()
+    return str(path.relative_to(cfg.root)) if path.is_relative_to(cfg.root) else str(path)
+
+
+def _find_video(cfg: Config, video_id: str) -> Path:
+    matches = sorted(p for p in cfg.paths.video_dir.glob(f"{video_id}.*") if p.is_file())
+    if not matches:
+        raise CalibrationError(f"no video for {video_id!r} in {cfg.paths.video_dir}")
+    return matches[0]
+
+
+def _import_views(
+    cfg: Config,
+    source: Path,
+    existing: CalibrationDoc | None,
+    video_id: str,
+    image_size: tuple[int, int],
+    force: bool,
+) -> CalibrationDoc:
+    """Reuse another clip's reference views: same match, same fixed broadcast cameras."""
+    donor = read_yaml_doc(source, CalibrationDoc)
+    if tuple(donor.image_size) != tuple(image_size):
+        raise CalibrationError(f"{source} was calibrated at {donor.image_size}, this video is {image_size}")
+    imported = [
+        v if v.source_video else v.model_copy(update={"source_video": _repo_relative(cfg, _find_video(cfg, donor.video_id))})
+        for v in donor.views
+    ]
+    kept = list(existing.views) if existing else []
+    clash = {v.name for v in kept} & {v.name for v in imported}
+    if clash and not force:
+        raise CalibrationError(f"views {sorted(clash)} already exist; pass --force to replace them")
+    kept = [v for v in kept if v.name not in clash]
+    return CalibrationDoc(video_id=video_id, image_size=image_size, views=[*kept, *imported])
 
 
 def summarize(result: CalibrateResult) -> list[str]:

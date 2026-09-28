@@ -96,3 +96,15 @@ def test_lost_players_expire():
     reg = PlayerRegistry(FPS, RegistryOptions(max_lost_frames=10))
     reg.update(0, [Detection(1, box_at(0, 0), (0.0, 0.0))])
     assert reg.update(30, [Detection(2, box_at(0, 0), (0.0, 0.0))]) == {2: 2}
+
+
+def test_camera_zoom_is_compensated_for_image_space_relinks():
+    # Feet hidden (no pitch position); the camera zooms 1.3x about the centre in one frame and
+    # the tracker hands out a new ID. Warping the remembered box keeps the same player.
+    reg = PlayerRegistry(FPS)
+    box = (900.0, 600.0, 960.0, 780.0)
+    reg.update(0, [Detection(1, box)])
+    zoom = np.array([[1.3, 0, 960 * -0.3], [0, 1.3, 540 * -0.3], [0, 0, 1]])
+    reg.camera_moved(zoom)
+    zoomed = tuple((np.array([[box[0], box[1], 1], [box[2], box[3], 1]]) @ zoom.T)[:, :2].ravel())
+    assert reg.update(1, [Detection(2, zoomed)]) == {2: 1}
