@@ -1,0 +1,39 @@
+# Score-bar layout: ICC Men's T20 World Cup 2024 broadcast graphics.
+# Rectangles are [x0, y0, x1, y1] in pixels of a reference_size frame and are scaled to the
+# actual frame size. A different broadcaster needs a different file, not different code.
+layout: icc_t20wc_2024
+reference_size: [1920, 1080]
+
+# The pink score box; if it is not on screen the bar is hidden (replay, graphic, cut).
+presence:
+  rect: [905, 952, 1025, 980]
+  hue: [150, 179]            # OpenCV hue range (0-179) of the pink box
+  min_fraction: 0.35
+
+fields:
+  batter1_name: [285, 947, 560, 985]
+  batter1_runs: [590, 947, 645, 985]
+  batter1_balls: [645, 947, 695, 985]
+  batter2_name: [285, 985, 560, 1022]
+  batter2_runs: [590, 985, 645, 1022]
+  batter2_balls: [645, 985, 695, 1022]
+  score: [895, 945, 1035, 987]
+  overs: [1040, 947, 1200, 985]
+  bowler_name: [1238, 947, 1520, 985]
+  bowler_figures: [1520, 947, 1605, 985]
+  bowler_overs: [1605, 947, 1675, 985]
+  lower: [1238, 985, 1640, 1025]     # this over's balls, or "SPEED 81.4 KPH | 50.6 MPH"
+
+# The yellow bat icon left of a batter's name marks the striker.
+striker_icon:
+  batter1: [248, 947, 284, 985]
+  batter2: [248, 985, 284, 1022]
+  hue: [18, 40]
+  min_fraction: 0.03
+
+sample_every: 12             # frames between reads (0.5 s at 25 fps); the bar changes slowly
+
+# Optional: names as the broadcast spells them, for correcting OCR slips.
+squads:
+  IND: [ROHIT, KOHLI, PANT, SURYAKUMAR, DUBE, HARDIK, JADEJA, AXAR, KULDEEP, BUMRAH, ARSHDEEP]
+  SA: [DE KOCK, HENDRICKS, MARKRAM, STUBBS, KLAASEN, MILLER, JANSEN, MAHARAJ, RABADA, NORTJE, SHAMSI]

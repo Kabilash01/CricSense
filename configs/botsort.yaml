@@ -1,0 +1,20 @@
+# BoT-SORT for players (ultralytics implementation), with two CricSense changes:
+#   - camera motion comes from our calibrated per-frame homographies (camera.json) where
+#     available, with sparse optical flow as the fallback on uncalibrated frames;
+#   - appearance ReID (a dedicated person model) is available but off: it did not reduce ID
+#     errors on the dev clip and cost ~30% speed; players in the same kit look alike.
+tracker_type: botsort
+track_high_thresh: 0.4
+track_low_thresh: 0.1
+new_track_thresh: 0.5
+track_buffer: 60          # frames a lost track is kept (2.4 s at 25 fps)
+match_thresh: 0.8
+fuse_score: True
+
+gmc_method: sparseOptFlow
+camera_motion_from_calibration: True
+
+proximity_thresh: 0.5
+appearance_thresh: 0.75
+with_reid: False            # measured on the dev clip: no fewer ID errors, ~30% slower (similar kits)
+model: models/yolo26s-reid.onnx  # relative to the repo root; downloaded on first use

@@ -14,7 +14,7 @@ new_track_thresh: 0.5
 track_buffer: 60
 
 # Matching threshold (higher = fewer ID switches)
-match_thresh: 0.9
+match_thresh: 0.8
 
 # Fuse detection confidence with IoU for matching
 fuse_score: True

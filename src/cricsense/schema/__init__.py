@@ -2,6 +2,7 @@ from cricsense.schema.models import (
     SCHEMA_VERSION,
     BallDoc,
     BallFrame,
+    BatterLine,
     CalibrationDoc,
     CameraDoc,
     CameraFrame,
@@ -14,6 +15,8 @@ from cricsense.schema.models import (
     ReferenceView,
     Role,
     RunInfo,
+    ScoreboardDoc,
+    ScoreboardReading,
     VideoMeta,
 )
 
@@ -21,6 +24,7 @@ __all__ = [
     "SCHEMA_VERSION",
     "BallDoc",
     "BallFrame",
+    "BatterLine",
     "CalibrationDoc",
     "CameraDoc",
     "CameraFrame",
@@ -33,5 +37,7 @@ __all__ = [
     "ReferenceView",
     "Role",
     "RunInfo",
+    "ScoreboardDoc",
+    "ScoreboardReading",
     "VideoMeta",
 ]

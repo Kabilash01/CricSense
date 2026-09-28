@@ -152,6 +152,69 @@ class CameraTracker:
         return cv2.contourArea(hull) >= _MIN_INLIER_SPREAD * frame_area
 
 
+# Pitch points whose image positions stand in for a frame's homography while smoothing.
+_ANCHORS = np.array([[1.22, -1.32], [1.22, 1.32], [18.9, -1.32], [18.9, 1.32]])
+_MIN_SEGMENT = 5  # shorter runs of calibrated frames are left as they are
+
+
+def smooth_homographies(
+    frames: list[tuple[int, np.ndarray | None]], window: int, outlier_px: float
+) -> tuple[list[np.ndarray | None], int]:
+    """Temporally smooth per-frame image->pitch homographies within each unbroken run.
+
+    Each frame is estimated independently against the reference, so consecutive estimates
+    jitter by several pixels (and a few are grossly wrong) while the real camera moves
+    smoothly. Per run: project four crease corners into every frame, replace frames that
+    disagree with their neighbours' median by more than `outlier_px` by interpolation, then
+    apply a Savitzky-Golay filter and rebuild each homography from the smoothed corners.
+    Returns the smoothed homographies (None where there was none) and the outlier count.
+    """
+    from scipy.ndimage import median_filter
+    from scipy.signal import savgol_filter
+
+    out: list[np.ndarray | None] = [H for _, H in frames]
+    outliers = 0
+    runs, run = [], []
+    for i, (_, H) in enumerate(frames):
+        if H is not None:
+            run.append(i)
+        elif run:
+            runs.append(run)
+            run = []
+    if run:
+        runs.append(run)
+
+    for run in runs:
+        if len(run) < _MIN_SEGMENT:
+            continue
+        P = np.stack([_project_inverse(frames[i][1], _ANCHORS) for i in run])  # (T, 4, 2)
+        flat = P.reshape(len(run), -1)
+        med = median_filter(flat, size=(min(7, len(run)), 1), mode="nearest")
+        bad = np.abs(flat - med).max(axis=1) > outlier_px
+        outliers += int(bad.sum())
+        good = np.where(~bad)[0]
+        if len(good) < _MIN_SEGMENT:
+            for i in run:
+                out[i] = None  # too unreliable to keep at all
+            continue
+        t = np.arange(len(run))
+        flat = np.stack([np.interp(t, good, flat[good, k]) for k in range(flat.shape[1])], axis=1)
+        w = min(window, len(run) // 2 * 2 - 1)
+        if w >= 5:
+            flat = savgol_filter(flat, window_length=w, polyorder=2, axis=0)
+        for j, i in enumerate(run):
+            img_pts = flat[j].reshape(4, 2).astype(np.float32)
+            H = cv2.getPerspectiveTransform(img_pts, _ANCHORS.astype(np.float32))
+            out[i] = H / H[2, 2]
+    return out, outliers
+
+
+def _project_inverse(image_to_pitch: np.ndarray, pitch_pts: np.ndarray) -> np.ndarray:
+    Hi = np.linalg.inv(image_to_pitch)
+    p = np.c_[pitch_pts, np.ones(len(pitch_pts))] @ Hi.T
+    return p[:, :2] / p[:, 2:3]
+
+
 def read_frames(path: Path, frame_ids: Iterable[int], resize: tuple[int, int] | None = None) -> dict[int, np.ndarray]:
     """The given frames of a video, decoded in one forward pass."""
     wanted = set(frame_ids)
@@ -183,19 +246,26 @@ def track_video(
         {v.name: (ref_images[v.frame_id], PitchHomography(np.array(v.image_to_pitch))) for v in calibration.views},
         opts,
     )
-    frames: list[CameraFrame] = []
+    raw: list[tuple[int, float, CameraEstimate]] = []
     t0 = time.perf_counter()
     with VideoReader(path, resize=resize) as reader:
         for frame in reader:
-            est = tracker.estimate(frame.image)
-            frames.append(
-                CameraFrame(
-                    frame_id=frame.frame_id,
-                    t=frame.t,
-                    view=est.view,
-                    image_to_pitch=None if est.homography is None else est.homography.H.tolist(),
-                    inliers=est.inliers,
-                )
-            )
+            raw.append((frame.frame_id, frame.t, tracker.estimate(frame.image)))
+
+    smoothed, _ = smooth_homographies(
+        [(fid, None if e.homography is None else e.homography.H) for fid, _, e in raw],
+        opts.smooth_window,
+        opts.outlier_px,
+    )
+    frames = [
+        CameraFrame(
+            frame_id=fid,
+            t=t,
+            view=est.view if H is not None else None,
+            image_to_pitch=None if H is None else H.tolist(),
+            inliers=est.inliers,
+        )
+        for (fid, t, est), H in zip(raw, smoothed)
+    ]
     run = RunInfo(wall_time_s=time.perf_counter() - t0, frames_processed=len(frames), device="cpu")
     return CameraDoc(video=video, run=run, frames=frames)

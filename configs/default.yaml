@@ -22,6 +22,10 @@ camera:
   ransac_px: 3.0          # RANSAC inlier threshold, in pixels of the (downscaled) frame
   min_inliers: 80         # below this a frame is treated as not showing a calibrated view
   max_chain_frames: 25    # frames tracked via the previous frame before a direct match is required
+  # Per-frame estimates jitter by several px (0.5-1 m on the pitch) while the camera moves
+  # smoothly: outliers vs the local median are replaced, then a Savitzky-Golay filter runs.
+  smooth_window: 11       # frames (odd)
+  outlier_px: 6.0         # crease-corner disagreement with neighbours that marks a bad frame
   # Broadcast graphics stay fixed on screen while the camera moves; matching on them would
   # drag the estimate toward "no motion". Rectangles as [x0, y0, x1, y1] fractions of the frame.
   overlay_mask:

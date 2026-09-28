@@ -22,6 +22,8 @@ OPTS = CameraOptions(
     ransac_px=2.0,
     min_inliers=40,
     max_chain_frames=25,
+    smooth_window=11,
+    outlier_px=6.0,
     overlay_mask=((0.0, 0.85, 1.0, 1.0),),
 )
 PROBES = np.array([(x, y) for x in np.linspace(0, 20.12, 6) for y in (-1.5, 0.0, 1.5)])
@@ -121,3 +123,31 @@ def test_picks_the_matching_view_among_several(world, reference):
     tracker = CameraTracker({"main": reference, "other_end": other_ref}, OPTS)
     assert tracker.estimate(render_frame(other_world, camera_homography(10, 5, 1.05))).view == "other_end"
     assert tracker.estimate(render_frame(world, camera_homography(10, 5, 1.05))).view == "main"
+
+
+def test_smoothing_removes_jitter_and_outliers():
+    from cricsense.calibration.camera_motion import smooth_homographies
+
+    rng = np.random.default_rng(3)
+    truths, noisy = [], []
+    for k, (pan, tilt, zoom) in enumerate(camera_path(40)):
+        H = camera_homography(pan, tilt, zoom)
+        truths.append(H)
+        jitter = np.array([[1, 0, rng.normal(0, 3)], [0, 1, rng.normal(0, 3)], [0, 0, 1]])  # ~3 px per frame
+        if k in (12, 27):
+            jitter[0, 2] += 60  # two grossly wrong estimates
+        noisy.append(true_image_to_pitch(jitter @ H))
+    frames = [(k, H) for k, H in enumerate(noisy)] + [(40, None)]
+    smoothed, outliers = smooth_homographies(frames, window=11, outlier_px=6.0)
+
+    def err(Hs):
+        """Worst pixel distance between where probes land under the estimate vs the truth."""
+        worst = 0.0
+        for H, truth in zip(Hs, truths):
+            est_px = project(np.linalg.inv(H), PROBES)
+            true_px = project(truth @ pitch_to_world(), PROBES)
+            worst = max(worst, float(np.linalg.norm(est_px - true_px, axis=1).max()))
+        return worst
+
+    assert outliers >= 2 and smoothed[-1] is None
+    assert err(smoothed[:40]) < err(noisy) / 3

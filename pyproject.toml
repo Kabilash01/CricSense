@@ -9,16 +9,17 @@ description = "Cricket video analysis: player identity and roles, ball line and 
 readme = "README.md"
 requires-python = ">=3.10"
 # Core deps only: enough for config, schema, video I/O, calibration and the CPU passes.
-# GPU passes need the [ml] extra; see requirements.txt for the CUDA 12.8 torch index.
+# GPU passes need the [ml] extra (torch + ultralytics); see requirements.txt.
 dependencies = [
     "numpy>=1.26",
     "opencv-python>=4.9",
     "pydantic>=2.6",
     "pyyaml>=6.0",
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]
-ml = ["torch>=2.7", "ultralytics>=8.3"]
+ml = ["torch>=2.7", "ultralytics>=8.4", "lap>=0.5", "onnxruntime>=1.20"]
 ocr = ["easyocr>=1.7", "pytesseract>=0.3.10"]
 render = ["matplotlib>=3.8"]
 dev = ["pytest>=8.0"]

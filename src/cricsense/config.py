@@ -41,6 +41,8 @@ class CameraOptions:
     ransac_px: float
     min_inliers: int
     max_chain_frames: int
+    smooth_window: int
+    outlier_px: float
     overlay_mask: tuple[tuple[float, float, float, float], ...]
 
 
@@ -120,6 +122,8 @@ def _camera_options(raw: dict[str, Any]) -> CameraOptions:
             ransac_px=float(raw["ransac_px"]),
             min_inliers=int(raw["min_inliers"]),
             max_chain_frames=int(raw["max_chain_frames"]),
+            smooth_window=int(raw.get("smooth_window", 11)),
+            outlier_px=float(raw.get("outlier_px", 6.0)),
             overlay_mask=tuple(tuple(float(v) for v in rect) for rect in raw.get("overlay_mask") or ()),
         )
     except KeyError as e:

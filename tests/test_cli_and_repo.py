@@ -7,7 +7,7 @@ import pytest
 from cricsense.cli import build_parser, main
 from tests.conftest import REPO_ROOT
 
-SUBCOMMANDS = ["calibrate", "players", "ball", "fuse", "render", "live"]
+SUBCOMMANDS = ["calibrate", "scoreboard", "players", "ball", "fuse", "render", "live"]
 
 
 def test_help_lists_every_subcommand():
@@ -20,7 +20,7 @@ def test_help_lists_every_subcommand():
 
 @pytest.mark.parametrize(
     "argv",
-    [["ball", "--video", "x.mp4"], ["players", "--video", "x.mp4"], ["fuse", "--video-id", "x"]],
+    [["ball", "--video", "x.mp4"], ["render", "--video-id", "x"], ["fuse", "--video-id", "x"]],
 )
 def test_unbuilt_commands_fail_loudly(argv, capsys):
     assert main(argv) == 2

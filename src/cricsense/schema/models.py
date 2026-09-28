@@ -153,6 +153,46 @@ class EventsDoc(_PassDoc):
         return self
 
 
+# --- Scoreboard --------------------------------------------------------------------------
+
+
+class BatterLine(_Strict):
+    name: str | None
+    runs: NonNegativeInt | None
+    balls: NonNegativeInt | None
+    on_strike: bool
+
+
+class ScoreboardReading(_Strict):
+    """What the broadcast score bar showed on one frame. Evidence, never authoritative."""
+
+    frame_id: NonNegativeInt
+    t: NonNegativeFloat
+    batters: list[BatterLine] = Field(min_length=2, max_length=2)
+    runs: NonNegativeInt | None
+    wickets: int | None = Field(default=None, ge=0, le=10)
+    legal_balls: NonNegativeInt | None  # overs "11.1" -> 67
+    bowler: str | None
+    bowler_wickets: int | None = Field(default=None, ge=0, le=10)
+    bowler_runs: NonNegativeInt | None
+    bowler_legal_balls: NonNegativeInt | None
+    speed_kph: float | None = Field(default=None, gt=0)  # the broadcaster's radar, as displayed
+    raw: dict[str, str] = Field(default_factory=dict)  # OCR text per field, for auditing
+
+
+class ScoreboardDoc(_PassDoc):
+    """outputs/<video_id>/scoreboard.json: readings on frames where the score bar was visible."""
+
+    pass_name: Literal["scoreboard"] = "scoreboard"
+    layout: str
+    readings: list[ScoreboardReading]
+
+    @model_validator(mode="after")
+    def _timing(self) -> ScoreboardDoc:
+        self._check_timing(self.readings)
+        return self
+
+
 # --- Calibration -------------------------------------------------------------------------
 
 Matrix3 = tuple[

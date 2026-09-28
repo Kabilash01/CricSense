@@ -1,5 +1,22 @@
-# Players pass. Keys are filled in during Phase 2.
+# Players pass.
 detector:
-  conf: 0.3
+  # COCO YOLOv8m, "person" class. Chosen on the dev clip over YOLOv8x / YOLO11 / YOLO26 (m and x,
+  # 640 and 1280): as accurate as v8x at 1280, 2.7x faster. The retrained 5-class model
+  # (models/players_best.pt) scores mAP50 0.895 on its own data but finds almost no one in
+  # the 2024 World Cup broadcast (domain shift), so roles come from pitch geometry instead.
+  weights: models/yolov8m.pt
+  classes: [0]
+  conf: 0.25
+  imgsz: 1280
+
 tracker:
-  config: configs/bytetrack.yaml
+  config: configs/botsort.yaml      # or configs/bytetrack.yaml
+
+# Only frames showing a calibrated view (camera.json) are processed: close-ups, replays and
+# aerial shots would otherwise add people who are not on the field of play.
+only_calibrated_frames: true
+
+registry:
+  max_lost_frames: 75
+  image_gap_frames: 10
+  pitch_gate_m: 1.5

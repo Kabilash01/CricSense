@@ -9,7 +9,6 @@ from pathlib import Path
 
 # Subcommand -> the build phase that implements it. Removed from here as each phase lands.
 _PENDING_PHASE = {
-    "players": 2,
     "ball": 3,
     "fuse": 4,
     "render": 5,
@@ -57,7 +56,15 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--no-propagate", action="store_true", help="save the reference view only")
     mode.add_argument("--propagate-only", action="store_true", help="recompute camera.json from the saved views")
 
-    add("players", "GPU pass: player tracks, stable IDs, roles, identities -> players.json", video=True)
+    add(
+        "scoreboard",
+        "CPU pass: read the broadcast score bar (batters, striker, score, bowler, radar speed) -> scoreboard.json",
+        _scoreboard,
+        video=True,
+    )
+    pl = add("players", "GPU pass: player tracks, stable IDs, roles, identities -> players.json", _players, video=True)
+    pl.add_argument("--tracker", type=Path, help="tracker config (default: configs/players.yaml tracker.config)")
+    pl.add_argument("--out-name", default="players.json", help="output file name inside outputs/<video_id>/")
     add("ball", "GPU pass: ball trajectory, bounce, line and length -> ball.json", video=True)
     add("fuse", "CPU pass: contact, boundary and wicket events -> events.json", video_id=True)
     add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", video_id=True)
@@ -87,6 +94,27 @@ def _calibrate(args: argparse.Namespace) -> int:
         print(f"cricsense calibrate: {e}", file=sys.stderr)
         return 1
     print("\n".join(summarize(result)))
+    return 0
+
+
+def _scoreboard(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.scoreboard import run_scoreboard, summarize
+
+    setup_logging()
+    doc, path = run_scoreboard(load_config(), args.video)
+    print("\n".join(summarize(doc, path)))
+    return 0
+
+
+def _players(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.players import run_players, summarize
+
+    setup_logging()
+    print("\n".join(summarize(run_players(load_config(), args.video, args.tracker, args.out_name))))
     return 0
 
 
