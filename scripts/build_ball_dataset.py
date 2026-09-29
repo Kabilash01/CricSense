@@ -19,7 +19,6 @@ Outputs data/ball_selftrain/ (YOLO format) and a few overlay previews for spot c
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -27,6 +26,7 @@ import cv2
 import numpy as np
 
 import cricsense  # noqa: F401  (disables ultralytics auto-install)
+from cricsense.ball.candidates import detect_candidates
 from cricsense.ball.delivery import Candidate, FrameGeometry, find_delivery
 from cricsense.io import VideoReader, read_doc
 from cricsense.schema import CameraDoc
@@ -49,24 +49,6 @@ def shots_of(frames: list[int]) -> list[list[int]]:
             cur = [b]
     shots.append(cur)
     return shots
-
-
-def detect(model, clip: str, frames: set[int], device: str) -> dict[int, list[dict]]:
-    cache = ROOT / "outputs" / clip / "ball_candidates_raw.json"
-    if cache.is_file():
-        return {int(k): v for k, v in json.loads(cache.read_text()).items()}
-    out: dict[int, list[dict]] = {}
-    with VideoReader(ROOT / "data" / f"{clip}.mp4") as reader:
-        for f in reader:
-            if f.frame_id not in frames:
-                continue
-            r = model.predict(f.image, imgsz=1920, conf=0.1, device=device, verbose=False)[0]
-            out[f.frame_id] = [
-                {"cls": int(c), "conf": round(float(s), 3), "box": [round(v, 1) for v in b]}
-                for c, s, b in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxy.tolist())
-            ]
-    cache.write_text(json.dumps(out))
-    return out
 
 
 def ball_labels(delivery, cands: dict[int, list[dict]]) -> dict[int, tuple[np.ndarray, bool]]:
@@ -112,9 +94,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--device", default="cuda:0")
     args = parser.parse_args(argv)
 
-    from ultralytics import YOLO
-
-    model = YOLO(str(args.weights))
     rng = np.random.default_rng(0)
     previews = args.out / "previews"
     previews.mkdir(parents=True, exist_ok=True)
@@ -132,7 +111,9 @@ def main(argv: list[str] | None = None) -> int:
         if not geo:
             print(f"{clip}: no calibrated frames, skipped")
             continue
-        cands = detect(model, clip, set(geo), args.device)
+        cands = detect_candidates(
+            ROOT / "data" / f"{clip}.mp4", set(geo), args.weights, ROOT / "outputs" / clip, device=args.device
+        )
         fps = cam.video.fps
         labels: dict[int, list[str]] = {}
         centres: dict[int, tuple[float, float]] = {}

@@ -1,0 +1,76 @@
+schema_version: '1.0'
+video_id: st_014500
+image_size: [1920, 1080]
+views:
+- name: main
+  source_video: data/final_0051_30s.mp4
+  frame_id: 200
+  image_to_pitch:
+  - [-5.8157299257276686e-18, 0.07876973841728391, -32.494038924506526]
+  - [0.011095262794426611, 8.405502116989851e-05, -10.865456366548107]
+  - [-4.6620790228424265e-19, 0.0008914926133469184, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [811.0, 434.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1141.0, 434.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [766.0, 830.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1180.0, 830.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points:
+  - name: striker_bowling_left
+    image: [814.0, 410.0]
+    pitch: [0.0, -1.32]
+  - name: striker_bowling_right
+    image: [1138.0, 410.0]
+    pitch: [0.0, 1.32]
+  - name: bowler_bowling_left
+    image: [766.0, 869.0]
+    pitch: [20.12, -1.32]
+  - name: bowler_bowling_right
+    image: [1182.0, 869.0]
+    pitch: [20.12, 1.32]
+  fit_rms_px: 1.0225363306315616e-05
+  check_rms_m: 0.14385981427221034
+  check_max_m: 0.14541925819856028
+- name: end_b
+  source_video: data/final_0051_6min.mp4
+  frame_id: 8290
+  image_to_pitch:
+  - [9.788197527472038e-18, 0.10273285749916722, -31.080400867055737]
+  - [0.012119327584382536, -5.9214955624018996e-05, -12.136795996291621]
+  - [7.979508492374766e-19, 0.0012112149532710291, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [852.0, 319.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1154.0, 319.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [813.0, 626.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1196.0, 626.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points:
+  - name: striker_bowling_left
+    image: [852.0, 304.0]
+    pitch: [0.0, -1.32]
+  - name: striker_bowling_right
+    image: [1153.0, 304.0]
+    pitch: [0.0, 1.32]
+  - name: bowler_bowling_left
+    image: [813.0, 656.0]
+    pitch: [20.12, -1.32]
+  - name: bowler_bowling_right
+    image: [1197.0, 656.0]
+    pitch: [20.12, 1.32]
+  fit_rms_px: 8.649183140910384e-06
+  check_rms_m: 0.11397008050998923
+  check_max_m: 0.11756899379015684
