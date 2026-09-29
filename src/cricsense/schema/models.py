@@ -77,10 +77,39 @@ class BallFrame(_Strict):
     frame_id: NonNegativeInt
     t: NonNegativeFloat
     uv: tuple[float, float]  # image coords, y increases downward
-    observed: bool  # False = Kalman prediction only
+    observed: bool  # True: a detection; False: interpolated between detections
+    delivery_id: NonNegativeInt | None = None
     # Projecting through the pitch homography is only valid when the ball touches the ground,
     # so this is set at the bounce frame and None everywhere else.
     pitch_xy: tuple[float, float] | None = None
+
+
+class LengthClass(str, Enum):
+    YORKER = "yorker"
+    FULL = "full"
+    GOOD = "good"
+    SHORT = "short"
+
+
+class Delivery(_Strict):
+    """One ball bowled, as seen from the main camera."""
+
+    delivery_id: NonNegativeInt
+    shot_frames: tuple[NonNegativeInt, NonNegativeInt]  # first and last frame of the camera shot
+    release_frame: NonNegativeInt
+    release_t: NonNegativeFloat
+    release_point: tuple[float, float, float]  # metres; on the release sight line at hand height
+    detections: NonNegativeInt
+    bounce_t: NonNegativeFloat | None = None
+    bounce_xy: tuple[float, float] | None = None  # metres; the ball is on the ground, so this is measured
+    bounce_confirmed: bool = False  # False: the ball was not seen after pitching
+    length_m: float | None = None  # distance of the bounce from the striker's stumps
+    line_m: float | None = None  # sideways offset from the middle-stump line (+ to image right)
+    length_class: LengthClass | None = None
+    # the broadcaster's radar reading shown after this ball: the authoritative speed
+    radar_speed_kph: float | None = Field(default=None, gt=0)
+    # our own estimate from release and bounce timing; single-camera, see ball/physics.py
+    speed_estimate_kph: float | None = Field(default=None, gt=0)
 
 
 class Event(_Strict):
@@ -140,6 +169,7 @@ class PlayersDoc(_PassDoc):
 class BallDoc(_PassDoc):
     pass_name: Literal["ball"] = "ball"
     frames: list[BallFrame]
+    deliveries: list[Delivery] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _timing(self) -> BallDoc:

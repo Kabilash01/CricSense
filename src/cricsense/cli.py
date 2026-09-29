@@ -10,7 +10,6 @@ from pathlib import Path
 
 # Subcommand -> the build phase that implements it. Removed from here as each phase lands.
 _PENDING_PHASE = {
-    "ball": 3,
     "fuse": 4,
     "render": 5,
     "live": 7,
@@ -73,7 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--tracker", type=Path, help="tracker config (default: configs/players.yaml tracker.config)")
     pl.add_argument("--out-name", default="players.json", help="output file name inside outputs/<video_id>/")
     pl.add_argument("--device", help="override configs/default.yaml device, e.g. cpu or cuda:0")
-    add("ball", "GPU pass: ball trajectory, bounce, line and length -> ball.json", video=True)
+    bl = add("ball", "GPU pass: deliveries - release, ball track, bounce, line and length, speeds -> ball.json", _ball, video=True)
+    bl.add_argument("--weights", type=Path, help="ball model (default: configs/ball.yaml detector.weights)")
+    bl.add_argument("--fresh", action="store_true", help="re-run the detector instead of using cached candidates")
+    bl.add_argument("--device", help="override configs/default.yaml device, e.g. cpu or cuda:0")
     add("fuse", "CPU pass: contact, boundary and wicket events -> events.json", video_id=True)
     add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", video_id=True)
     add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
@@ -127,6 +129,20 @@ def _players(args: argparse.Namespace) -> int:
     if args.device:
         cfg = dataclasses.replace(cfg, device=args.device)
     print("\n".join(summarize(run_players(cfg, args.video, args.tracker, args.out_name))))
+    return 0
+
+
+def _ball(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.ball import run_ball, summarize
+
+    setup_logging()
+    cfg = load_config()
+    if args.device:
+        cfg = dataclasses.replace(cfg, device=args.device)
+    doc, path = run_ball(cfg, args.video, args.weights, args.fresh)
+    print("\n".join(summarize(doc, path)))
     return 0
 
 

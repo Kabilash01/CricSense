@@ -1,7 +1,13 @@
-# Ball pass. Keys are filled in during Phase 3.
+# Ball pass.
 detector:
-  conf: 0.1
-  min_area: 20
-  max_area: 2500
-  min_ratio: 0.6
-  max_ratio: 1.4
+  weights: models/ball_best.pt   # YOLOv8l, classes ball + stump
+  imgsz: 1920                    # native resolution: the ball is 6-15 px, downscaling loses it
+  conf: 0.1                      # candidates; the delivery tracker decides what is the ball
+  min_track_conf: 0.15
+
+# Length zones by distance of the bounce from the striker's stumps (metres), as commonly
+# used for pace bowling. Spinners' good length is fuller; the metres are reported either way.
+length_zones:
+  yorker: 2.0     # < 2 m
+  full: 6.0       # 2-6 m
+  good: 8.0       # 6-8 m; beyond 8 m is short
