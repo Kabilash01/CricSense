@@ -10,7 +10,6 @@ from pathlib import Path
 
 # Subcommand -> the build phase that implements it. Removed from here as each phase lands.
 _PENDING_PHASE = {
-    "fuse": 4,
     "render": 5,
     "live": 7,
 }
@@ -76,7 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
     bl.add_argument("--weights", type=Path, help="ball model (default: configs/ball.yaml detector.weights)")
     bl.add_argument("--fresh", action="store_true", help="re-run the detector instead of using cached candidates")
     bl.add_argument("--device", help="override configs/default.yaml device, e.g. cpu or cuda:0")
-    add("fuse", "CPU pass: contact, boundary and wicket events -> events.json", video_id=True)
+    fu = add("fuse", "event timeline: release, bounce, bat contact, runs, boundaries, wickets, wides -> events.json", _fuse, video_id=True)
+    fu.add_argument("--device", help="override configs/default.yaml device for the bat detector")
     add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", video_id=True)
     add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
     return parser
@@ -142,6 +142,20 @@ def _ball(args: argparse.Namespace) -> int:
     if args.device:
         cfg = dataclasses.replace(cfg, device=args.device)
     doc, path = run_ball(cfg, args.video, args.weights, args.fresh)
+    print("\n".join(summarize(doc, path)))
+    return 0
+
+
+def _fuse(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.fuse import run_fuse, summarize
+
+    setup_logging()
+    cfg = load_config()
+    if args.device:
+        cfg = dataclasses.replace(cfg, device=args.device)
+    doc, path = run_fuse(cfg, args.video_id)
     print("\n".join(summarize(doc, path)))
     return 0
 

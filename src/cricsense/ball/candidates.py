@@ -17,21 +17,25 @@ def detect_candidates(
     conf: float = 0.1,
     device: str = "cuda:0",
     fresh: bool = False,
+    tag: str = "ball_candidates",
 ) -> dict[int, list[dict]]:
-    """frame -> [{"cls": 0 ball | 1 stump, "conf", "box": [x1, y1, x2, y2]}] for the given frames.
+    """frame -> [{"cls", "conf", "box": [x1, y1, x2, y2]}] for the given frames (any YOLO model;
+    the ball model's classes are 0 ball, 1 stump; the bat model's 1 bat).
 
     Runs at native resolution: the ball is 6-15 px and a 1920 frame shrunk to 1280 loses it
     (on the dev clip: candidates in 25 of 30 flight frames at 1920 vs 14 at 1280).
     """
-    cache = cache_dir / f"ball_candidates_{weights.stem}.json"
+    cache = cache_dir / f"{tag}_{weights.stem}.json"
+    cached: dict[int, list[dict]] = {}
     if not fresh and cache.is_file():
         cached = {int(k): v for k, v in json.loads(cache.read_text()).items()}
         if frames <= set(cached):
             return cached
+    frames = frames - set(cached)  # only what is not cached yet
     from ultralytics import YOLO
 
     model = YOLO(str(weights))
-    out: dict[int, list[dict]] = {}
+    out: dict[int, list[dict]] = dict(cached)
     with VideoReader(video) as reader:
         for f in reader:
             if f.frame_id not in frames:

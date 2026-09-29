@@ -41,9 +41,12 @@ class Role(str, Enum):
 class EventType(str, Enum):
     RELEASE = "RELEASE"
     BOUNCE = "BOUNCE"
-    CONTACT = "CONTACT"
-    BOUNDARY = "BOUNDARY"
+    CONTACT = "CONTACT"  # bat on ball
+    RUNS = "RUNS"  # the ball's outcome: runs off the bat and extras
+    BOUNDARY = "BOUNDARY"  # payload kind: FOUR | SIX
     WICKET = "WICKET"
+    WIDE = "WIDE"
+    NO_BALL = "NO_BALL"
 
 
 class _Strict(BaseModel):

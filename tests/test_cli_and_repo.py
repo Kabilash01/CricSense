@@ -20,7 +20,7 @@ def test_help_lists_every_subcommand():
 
 @pytest.mark.parametrize(
     "argv",
-    [["live", "--video", "x.mp4"], ["render", "--video-id", "x"], ["fuse", "--video-id", "x"]],
+    [["live", "--video", "x.mp4"], ["render", "--video-id", "x"]],
 )
 def test_unbuilt_commands_fail_loudly(argv, capsys):
     assert main(argv) == 2
