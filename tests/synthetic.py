@@ -14,10 +14,11 @@ import numpy as np
 
 from cricsense.calibration import pitch_model
 
-PX_PER_M = 60.0  # fine enough that zoomed-in frames still have texture to match
-# World image covers x in [-10, 30] m along the pitch and y in [-15, 15] m across it.
-WORLD_X0, WORLD_Y0 = -10.0, -15.0
-WORLD_W, WORLD_H = int(40 * PX_PER_M), int(30 * PX_PER_M)
+PX_PER_M = 40.0  # fine enough that zoomed-in frames still have texture to match
+# World image covers x in [-30, 70] m along the pitch and y in [-35, 35] m across it: all a
+# camera in the stand behind the bowler can see at the zooms the tests use.
+WORLD_X0, WORLD_Y0 = -30.0, -35.0
+WORLD_W, WORLD_H = int(70 * PX_PER_M), int(100 * PX_PER_M)
 FRAME_SIZE = (960, 540)  # width, height
 
 
@@ -49,22 +50,37 @@ def render_world(seed: int = 0, creases: bool = True) -> np.ndarray:
     return world
 
 
-def camera_homography(pan_px: float = 0.0, tilt_px: float = 0.0, zoom: float = 1.0) -> np.ndarray:
-    """World pixels -> frame pixels for a camera behind the bowler looking down the pitch.
+CAMERA_CENTRE = np.array([86.0, 0.0, 12.0])  # metres: as measured for the real broadcast camera
+LOOK_AT = np.array([10.0, 0.0, 0.0])
+BASE_FOCAL = 4400.0  # px at 960 wide: ~12.5 deg field of view, like the real camera zoomed out
 
-    The base view is a fixed perspective; pan/tilt/zoom are applied in the image, which is
-    exactly how a PTZ camera's view changes.
+
+def camera_projection(pan_px: float = 0.0, tilt_px: float = 0.0, zoom: float = 1.0) -> np.ndarray:
+    """3x4 projection of a real pan-tilt-zoom camera: fixed position, rotating and zooming.
+
+    pan_px / tilt_px turn the camera by the angle that moves the image centre by that many
+    pixels at the base zoom.
     """
     w, h = FRAME_SIZE
-    to_world = pitch_to_world()
-    # Base view: where four pitch points land in the frame (striker end far, bowler end near).
-    pitch_quad = np.array([[-2, -6], [-2, 6], [24, -9], [24, 9]], float)
-    frame_quad = np.array([[330, 80], [630, 80], [60, 520], [900, 520]], float)
-    world_quad = np.c_[pitch_quad, np.ones(4)] @ to_world.T
-    base = cv2.getPerspectiveTransform(world_quad[:, :2].astype(np.float32), frame_quad.astype(np.float32))
-    cx, cy = w / 2, h / 2
-    ptz = np.array([[zoom, 0, cx - zoom * cx + pan_px], [0, zoom, cy - zoom * cy + tilt_px], [0, 0, 1]])
-    return ptz @ base
+    fwd = LOOK_AT - CAMERA_CENTRE
+    fwd /= np.linalg.norm(fwd)
+    right = np.cross(fwd, [0.0, 0.0, 1.0])
+    right /= np.linalg.norm(right)
+    down = np.cross(fwd, right)
+    R0 = np.stack([right, down, fwd])  # world -> camera (x right, y down, z forward)
+    pan, tilt = np.arctan2(pan_px, BASE_FOCAL), np.arctan2(tilt_px, BASE_FOCAL)
+    Ry = np.array([[np.cos(pan), 0, -np.sin(pan)], [0, 1, 0], [np.sin(pan), 0, np.cos(pan)]])
+    Rx = np.array([[1, 0, 0], [0, np.cos(tilt), np.sin(tilt)], [0, -np.sin(tilt), np.cos(tilt)]])
+    R = Rx @ Ry @ R0
+    f = BASE_FOCAL * zoom
+    K = np.array([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1.0]])
+    return K @ np.c_[R, -R @ CAMERA_CENTRE]
+
+
+def camera_homography(pan_px: float = 0.0, tilt_px: float = 0.0, zoom: float = 1.0) -> np.ndarray:
+    """World pixels -> frame pixels for that camera (the ground plane only)."""
+    ground_to_image = camera_projection(pan_px, tilt_px, zoom)[:, [0, 1, 3]]
+    return ground_to_image @ np.linalg.inv(pitch_to_world())
 
 
 def true_image_to_pitch(world_to_frame: np.ndarray) -> np.ndarray:

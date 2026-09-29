@@ -202,6 +202,9 @@ class ScoreboardDoc(_PassDoc):
 Matrix3 = tuple[
     tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]
 ]
+Matrix34 = tuple[
+    tuple[float, float, float, float], tuple[float, float, float, float], tuple[float, float, float, float]
+]
 
 
 class LandmarkObservation(_Strict):
@@ -254,7 +257,9 @@ class CameraFrame(_Strict):
     frame_id: NonNegativeInt
     t: NonNegativeFloat
     view: str | None  # None: no reference view matched (cut, replay, close-up, other end)
-    image_to_pitch: Matrix3 | None
+    image_to_pitch: Matrix3 | None  # ground plane (z = 0): pixels -> pitch metres
+    # full 3D camera: pitch metres (x, y, z up) -> homogeneous pixels; places things above the ground
+    projection: Matrix34 | None = None
     inliers: NonNegativeInt  # feature matches supporting the estimate
 
     @model_validator(mode="after")

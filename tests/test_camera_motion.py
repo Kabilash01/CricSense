@@ -7,6 +7,7 @@ from cricsense.calibration.camera_motion import CameraTracker
 from cricsense.calibration.homography import PitchHomography
 from cricsense.config import CameraOptions
 from tests.synthetic import (
+    FRAME_SIZE,
     camera_homography,
     camera_path,
     pitch_to_world,
@@ -41,9 +42,18 @@ def reference(world):
 
 
 def pixel_error(estimate, world_to_frame) -> float:
-    """Worst probe error in pixels: the tracker's own accuracy, independent of foreshortening."""
+    """Worst error in pixels over the probes the frame actually shows (0 if it shows none).
+
+    Pixels measure the tracker itself, independent of foreshortening; probes outside the
+    frame would only measure extrapolation.
+    """
     true_px = project(world_to_frame @ pitch_to_world(), PROBES)
-    return float(np.linalg.norm(estimate.homography.pitch_to_image(PROBES) - true_px, axis=1).max())
+    w, h = FRAME_SIZE
+    visible = (true_px[:, 0] >= 0) & (true_px[:, 0] < w) & (true_px[:, 1] >= 0) & (true_px[:, 1] < h)
+    if not visible.any():
+        return 0.0
+    est_px = estimate.homography.pitch_to_image(PROBES[visible])
+    return float(np.linalg.norm(est_px - true_px[visible], axis=1).max())
 
 
 def test_tracks_a_delivery_pan_and_zoom(world, reference):

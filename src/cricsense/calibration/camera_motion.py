@@ -23,6 +23,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from cricsense.calibration.camera_pose import CameraPose, PoseError
 from cricsense.calibration.homography import CalibrationError, PitchHomography
 from cricsense.config import CameraOptions
 from cricsense.io import VideoReader
@@ -215,6 +216,24 @@ def _project_inverse(image_to_pitch: np.ndarray, pitch_pts: np.ndarray) -> np.nd
     return p[:, :2] / p[:, 2:3]
 
 
+def _pose(
+    image_to_pitch: np.ndarray, image_size: tuple[int, int], previous: CameraPose | None, reference: CameraPose
+) -> CameraPose | None:
+    """This frame's full 3D camera: the view's fixed camera position, zoom and rotation fitted
+    to this frame's own ground calibration (None if no fit exists).
+
+    Ground positions keep using the 8-parameter calibration directly (~2-4 px on detected
+    stump bases). A camera fitted freely per frame wandered 67-106 m within one delivery,
+    so sight lines to the flying ball from different frames did not meet; fixing the
+    position at the reference camera keeps the stump check (base ~10 px, height ratio
+    0.97-0.98) and makes the frames agree with each other.
+    """
+    try:
+        return (previous or reference).with_centre(image_to_pitch, image_size, reference.centre)
+    except (PoseError, np.linalg.LinAlgError):
+        return None
+
+
 def read_frames(path: Path, frame_ids: Iterable[int], resize: tuple[int, int] | None = None) -> dict[int, np.ndarray]:
     """The given frames of a video, decoded in one forward pass."""
     wanted = set(frame_ids)
@@ -275,15 +294,25 @@ def track_video(
         opts.smooth_window,
         opts.outlier_px,
     )
-    frames = [
-        CameraFrame(
-            frame_id=fid,
-            t=t,
-            view=est.view if H is not None else None,
-            image_to_pitch=None if H is None else H.tolist(),
-            inliers=est.inliers,
+    size = (video.width, video.height)
+    references = {v.name: CameraPose.from_homography(np.array(v.image_to_pitch), size) for v in calibration.views}
+    frames = []
+    prev_pose: CameraPose | None = None
+    prev_view: str | None = None
+    for (fid, t, est), H in zip(raw, smoothed):
+        view = est.view if H is not None else None
+        seed = prev_pose if view is not None and view == prev_view else None
+        pose = None if view is None else _pose(H, size, seed, references[view])
+        prev_pose, prev_view = pose, view
+        frames.append(
+            CameraFrame(
+                frame_id=fid,
+                t=t,
+                view=est.view if H is not None else None,
+                image_to_pitch=None if H is None else H.tolist(),
+                projection=None if pose is None else pose.P.tolist(),
+                inliers=est.inliers,
+            )
         )
-        for (fid, t, est), H in zip(raw, smoothed)
-    ]
     run = RunInfo(wall_time_s=time.perf_counter() - t0, frames_processed=len(frames), device="cpu")
     return CameraDoc(video=video, run=run, frames=frames)
