@@ -16,6 +16,7 @@ import numpy as np
 
 from cricsense.render.draw import blend, chip, panel, paste
 from cricsense.render.pitch_map import LENGTH_COLORS, MapPoint, MapView, draw_pitch_map
+from cricsense.render.wagon_wheel import Shot, draw_wagon_wheel
 from cricsense.schema import BallDoc, CameraDoc, EventsDoc, EventType, PlayersDoc, Role
 
 TEAM_COLORS = {"IND": (230, 130, 30), "SA": (70, 165, 40)}  # BGR
@@ -83,6 +84,7 @@ class Scene:
         self.shots: dict[int, str] = {}  # delivery -> "slog sweep, leg side" (commentary.json, read by the VLM)
         self.skeletons: dict[int, np.ndarray] = {}  # frame -> striker COCO-17 keypoints (pose.json)
         self.batter: dict[int, str] = {}  # delivery -> "back foot 0.9 m, played" (pose.json)
+        self.wagon: list[tuple[int, Shot]] = []  # (delivery, scoring shot) for the wagon wheel
         self.players: dict[int, list] = defaultdict(list)
         if players:
             for p in players.frames:
@@ -398,7 +400,17 @@ def _card(frame: np.ndarray, f: int, dv: DeliveryView, scene: Scene) -> None:
 INSET = MapView(px_per_m=28.0, x_range=(-1.0, 12.0), margin_m=1.0, gutter_px=18)
 
 
+WAGON_SIZE = 330
+
+
 def _inset(frame: np.ndarray, f: int, dv: DeliveryView, scene: Scene) -> None:
+    scored = [k for k, (did, _) in enumerate(scene.wagon) if did == dv.did]
+    if scored and dv.outcome_frame is not None and f >= dv.outcome_frame:
+        # after a scoring shot: where it went, with the shots before it
+        upto = [shot for did, shot in scene.wagon if did <= dv.did]
+        img = draw_wagon_wheel(upto, WAGON_SIZE, highlight=len(upto) - 1)
+        blend(frame, img, scene.w - WAGON_SIZE - 20, int(0.85 * scene.h) - WAGON_SIZE - 14)
+        return
     shown = [
         k
         for k, d in enumerate(d for d in scene.deliveries if d.length_m is not None)

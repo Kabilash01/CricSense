@@ -115,3 +115,21 @@ def swing(obs: list[Observation], release: int, fps: float, th: Thresholds) -> t
         return None, None, None
     peak_frame, peak = max(speeds, key=lambda s: s[1])
     return ("played" if peak >= th.swing_speed else "left"), peak_frame, round(peak, 2)
+
+
+HAND_MARGIN_M = 0.08  # the feet this far either side of middle stump to call it
+
+
+def batting_hand(obs: list[Observation], release: int) -> str | None:
+    """"right" or "left": in the stance a right-hander's feet are on the camera's right of middle
+    stump (pitch y > 0 from behind the bowler), a left-hander's on the left."""
+    ys = []
+    for o in obs:
+        if o.frame <= release:
+            feet = [p for j in (L_ANKLE, R_ANKLE) if (p := o.foot(j)) is not None]
+            if feet:
+                ys.append(float(np.mean([p[1] for p in feet])))
+    if not ys:
+        return None
+    y = float(np.median(ys))
+    return "right" if y > HAND_MARGIN_M else "left" if y < -HAND_MARGIN_M else None

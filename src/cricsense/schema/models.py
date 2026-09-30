@@ -394,6 +394,7 @@ class BatterAction(_Strict):
     swing: Literal["played", "left"] | None
     swing_peak_frame: NonNegativeInt | None
     hand_speed: float | None  # peak wrist speed, body heights per second
+    batting_hand: Literal["right", "left"] | None = None  # from where the feet stand at the stance
     frames: NonNegativeInt  # frames with the striker's pose
 
 

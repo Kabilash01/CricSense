@@ -21,6 +21,7 @@ from cricsense.config import Config
 from cricsense.io import VideoReader, read_doc
 from cricsense.render.overlay import Scene, compose
 from cricsense.render.pitch_map import summary_png
+from cricsense.render.wagon_wheel import Shot, draw_wagon_wheel
 from cricsense.commentary.llm import WORDS_PER_S
 from cricsense.schema import BallDoc, CameraDoc, CommentaryDoc, EventsDoc, EventType, PlayersDoc, PoseDoc
 
@@ -135,10 +136,29 @@ def run_render(
     fps = ball.video.fps
     size = (ball.video.width, ball.video.height)
     scene = Scene(ball, events, players, camera, size)
+    hands: dict[int, str] = {}
+    if (out_dir / "pose.json").is_file():
+        hands = {b.delivery_id: b.batting_hand for b in read_doc(out_dir / "pose.json", PoseDoc).batters if b.batting_hand}
     if (out_dir / "commentary.json").is_file():
-        for fact in read_doc(out_dir / "commentary.json", CommentaryDoc).facts:
+        facts = read_doc(out_dir / "commentary.json", CommentaryDoc).facts
+        # one batting hand per batter: the majority over their deliveries
+        by_name: dict[str, list[str]] = {}
+        for fact in facts:
+            if fact["delivery_id"] in hands and fact.get("striker"):
+                by_name.setdefault(fact["striker"], []).append(hands[fact["delivery_id"]])
+        hand_of = {n: max(set(v), key=v.count) for n, v in by_name.items()}
+        for fact in facts:
             if fact.get("shot"):
                 scene.shots[fact["delivery_id"]] = f"{fact['shot']}, {fact['direction']}"
+            hand = hand_of.get(fact.get("striker"))
+            if fact.get("shot") and hand and (fact.get("off_bat") or 0) > 0:
+                scene.wagon.append((fact["delivery_id"], Shot(fact["over"] or str(fact["delivery_id"] + 1), fact["shot"], fact["off_bat"], hand)))
+        if scene.wagon:
+            ww = draw_wagon_wheel([s for _, s in scene.wagon], 720, bg_alpha=255)
+            canvas = np.full((ww.shape[0], ww.shape[1], 3), (22, 24, 26), np.uint8)
+            a = ww[..., 3:4] / 255.0
+            canvas[:] = (ww[..., :3] * a + canvas * (1 - a)).astype(np.uint8)
+            cv2.imwrite(str(out_dir / "wagon_wheel.png"), canvas)
     if (out_dir / "pose.json").is_file():
         pose = read_doc(out_dir / "pose.json", PoseDoc)
         scene.skeletons = {p.frame_id: np.array(p.keypoints) for p in pose.frames}

@@ -17,7 +17,7 @@ import numpy as np
 
 from cricsense.config import Config, video_id_from_path
 from cricsense.io import VideoReader, read_doc, write_doc
-from cricsense.pose.batter import Observation, Thresholds, footwork, swing
+from cricsense.pose.batter import Observation, Thresholds, batting_hand, footwork, swing
 from cricsense.schema import BallDoc, BatterAction, CameraDoc, EventsDoc, EventType, PlayersDoc, PoseDoc, PoseFrame, Role, RunInfo
 
 log = logging.getLogger("cricsense.pose")
@@ -103,7 +103,7 @@ def run_pose(cfg: Config, video: Path, device: str | None = None) -> tuple[PoseD
             BatterAction(
                 delivery_id=d.delivery_id,
                 sid=max(set(sids), key=sids.count) if sids else None,
-                footwork=fw, stride_m=stride, swing=sw, swing_peak_frame=peak_f, hand_speed=speed,
+                footwork=fw, stride_m=stride, swing=sw, batting_hand=batting_hand(obs, d.release_frame), swing_peak_frame=peak_f, hand_speed=speed,
                 frames=len(obs),
             )
         )
@@ -122,6 +122,8 @@ def summarize(doc: PoseDoc, path: Path) -> list[str]:
             parts.append(f"{b.footwork} ({b.stride_m:+.2f} m)")
         if b.swing:
             parts.append(f"{b.swing} (hands {b.hand_speed} body-heights/s)")
+        if b.batting_hand:
+            parts.append(f"{b.batting_hand}-handed")
         out.append(" | ".join(parts))
     out.append(f"pose: {path}")
     return out
