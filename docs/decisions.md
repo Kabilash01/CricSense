@@ -63,3 +63,12 @@ on all 10 balls of the evaluation clip. Fielders appear only in follow and wide 
 show one to three of them, from cameras at other angles where the creases are a few pixels
 long. No frame shows the field setting, so a fielder map from the broadcast would be mostly
 empty; it needs a fixed wide camera or the broadcaster's own tracking data.
+
+## Runs by running between the wickets: not measurable from the broadcast
+
+The broadcast shows the pitch for at most 1.8 s unbroken after the shot on 14 of 15 balls
+(one ball 3.8 s); a run takes about 3-3.5 s, two about 7 s. The picture cuts to the chasing
+fielder, the ball or a close-up, so the running is mostly off screen. Runs, boundaries and
+wickets are therefore read from the score bar (labelled so), and the score engine's checks on
+score and overs are consistency checks, not independent measurements; strike rotation,
+balls faced and bowler figures are the genuinely tested parts.

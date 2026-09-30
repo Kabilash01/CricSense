@@ -49,6 +49,26 @@ def white_mask(img: np.ndarray, bottom: float = 0.85) -> np.ndarray:
     return mask
 
 
+def pitch_colour(img: np.ndarray) -> np.ndarray:
+    """The pitch's dry, pale-brown ground: warm hue, some saturation, fairly bright. Grass is
+    too green, boards and crowds are anything but this, so it locates where creases can be."""
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    m = ((h >= 8) & (h <= 32) & (s >= 20) & (s <= 150) & (v >= 100)).astype(np.uint8)
+    return cv2.morphologyEx(m, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9)))
+
+
+def _on_pitch(segs: np.ndarray, ground: np.ndarray, gap: int = 6) -> np.ndarray:
+    """Segments with pitch-coloured ground just above and below their middle."""
+    h, w = ground.shape
+    keep = []
+    for x1, y1, x2, y2 in segs:
+        u, v = int((x1 + x2) / 2), int((y1 + y2) / 2)
+        if gap <= v < h - gap and 0 <= u < w and ground[v - gap, u] and ground[v + gap, u]:
+            keep.append((x1, y1, x2, y2))
+    return np.array(keep, dtype=segs.dtype).reshape(-1, 4)
+
+
 def _model_samples(step_m: float = 0.05) -> np.ndarray:
     """Points along every painted crease (not the pitch edges, which are not painted)."""
     pts = []
@@ -160,7 +180,8 @@ def calibrate(img: np.ndarray, bottom: float = 0.85) -> AutoCalibration | None:
     if segs is None:
         return None
     segs = segs.reshape(-1, 4)
-    lines = _horizontal_lines(mask, segs, w)[:8]
+    # creases are painted on the pitch: boards, logos and crowds make long white lines too
+    lines = _horizontal_lines(mask, _on_pitch(segs, pitch_colour(img)), w)[:8]
     # the far end's return creases are only ~40 px long: a more sensitive pass for them
     short = cv2.HoughLinesP(mask * 255, 1, np.pi / 360, threshold=20, minLineLength=14, maxLineGap=4)
     steep = _steep_segments(segs if short is None else np.vstack([segs, short.reshape(-1, 4)]))
