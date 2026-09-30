@@ -100,3 +100,19 @@ def test_unchanged_fields_are_not_re_read():
     assert first == len(LAYOUT.fields) and reader.ocr_calls == first
     reader.read(frame_with("scorebar_radar_speed.png"), 24, 0.96)
     assert first < reader.ocr_calls < 2 * first  # only the fields that changed
+
+
+def test_impossible_ocr_values_become_unknown_not_errors():
+    from cricsense.identity.scoreboard_ocr import _within
+
+    assert _within(114, 0, 10) is None and _within(3, 0, 10) == 3 and _within(None, 0, 10) is None
+
+
+def test_surname_prefixes_dropped_by_ocr_still_match_the_squad():
+    from cricsense.identity.scoreboard_ocr import clean_name
+
+    squad = ("DE KOCK", "STUBBS", "VAN DER DUSSEN", "SHARMA", "ROHIT SHARMA")
+    assert clean_name("KOCK", squad) == "DE KOCK"
+    assert clean_name("RKOCK", squad) == "DE KOCK"
+    assert clean_name("DUSSEN", squad) == "VAN DER DUSSEN"
+    assert clean_name("SHARMA", squad) == "SHARMA"  # exact full name wins before the surname rule

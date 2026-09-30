@@ -45,3 +45,21 @@ upright drives they described correctly when asked what they saw. The VLM now on
 posture, foot, bat finish and ball side; the shot is named by textbook rules
 (`commentary/vlm.py: name_shot`), with the measured footwork from pose taking precedence.
 Shown as "(AI read)". Not yet checked against a hand-labelled answer key.
+
+## Calibration: automatic from the painted creases
+
+Every pitch has the same creases, so the main view is calibrated without clicks
+(`calibrate --auto`): hypotheses from white lines, scored by how much of the regulation
+creases lands on paint plus the stumps' position, impossible cameras rejected, the best frame
+of each camera view kept as its reference. Dev frame: 7 of 8 corners within 3.3 px of the
+hand clicks; where the hand-clicked view had drifted (bowler's end, frame 6563) the automatic
+one sits on the paint; the second innings, never calibrated before, calibrates on all 5
+deliveries of the test clip.
+
+## Fielder map: not attempted
+
+At the moment of delivery the main view shows five people (bowler, batters, keeper, umpire)
+on all 10 balls of the evaluation clip. Fielders appear only in follow and wide shots that
+show one to three of them, from cameras at other angles where the creases are a few pixels
+long. No frame shows the field setting, so a fielder map from the broadcast would be mostly
+empty; it needs a fixed wide camera or the broadcaster's own tracking data.

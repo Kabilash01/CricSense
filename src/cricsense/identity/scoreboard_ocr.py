@@ -104,6 +104,15 @@ def clean_name(text: str, squad: tuple[str, ...] = ()) -> str | None:
         close = difflib.get_close_matches(name, squad, n=1, cutoff=0.75)
         if close:
             return close[0]
+        # Bars often print a surname prefix in small lower case ("de KOCK", "van der DUSSEN")
+        # that OCR drops or mangles: match the last word, unless two players share it.
+        surnames: dict[str, list[str]] = {}
+        for full in squad:
+            surnames.setdefault(full.split()[-1], []).append(full)
+        unique = {k: v[0] for k, v in surnames.items() if len(v) == 1}
+        close = difflib.get_close_matches(name.split()[-1], list(unique), n=1, cutoff=0.75)
+        if close:
+            return unique[close[0]]
     return name
 
 
@@ -156,6 +165,9 @@ class ScoreboardReader:
         ]
         runs, wickets = parse_score(raw["score"])
         bowler_wickets, bowler_runs = parse_score(raw["bowler_figures"])
+        # an OCR misread costs that field, never the reading: impossible values become unknown
+        wickets, bowler_wickets = _within(wickets, 0, 10), _within(bowler_wickets, 0, 10)
+        speed = parse_speed_kph(raw["lower"])
         return ScoreboardReading(
             frame_id=frame_id,
             t=t,
@@ -167,7 +179,7 @@ class ScoreboardReader:
             bowler_wickets=bowler_wickets,
             bowler_runs=bowler_runs,
             bowler_legal_balls=parse_overs(raw["bowler_overs"]),
-            speed_kph=parse_speed_kph(raw["lower"]),
+            speed_kph=speed if speed is None or 40 <= speed <= 170 else None,
             raw=raw,
         )
 
@@ -210,3 +222,8 @@ class ScoreboardReader:
         else:
             config = f"--psm 7 -c tessedit_char_whitelist={_NUMBER_CHARS}"
         return pytesseract.image_to_string(binary, config=config).strip()
+
+
+def _within(value: int | None, lo: int, hi: int) -> int | None:
+    return value if value is not None and lo <= value <= hi else None
+

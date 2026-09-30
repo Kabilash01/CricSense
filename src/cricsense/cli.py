@@ -88,6 +88,9 @@ def build_parser() -> argparse.ArgumentParser:
     rn.add_argument("--end", type=float, help="last second to render (default: the end)")
     rn.add_argument("--out-name", default="overlay.mp4", help="output file name inside outputs/<video_id>/")
     rn.add_argument("--no-voice", action="store_true", help="leave the commentary audio and captions out")
+    ru = add("run", "every pass on one video, in order: calibrate (automatic if needed) ... render", _run, video=True)
+    ru.add_argument("--fresh", nargs="*", default=[], metavar="STEP", help="re-run these steps even if their output exists (or: all)")
+    ru.add_argument("--voice", action="store_true", help="also speak the commentary (needs a TTS key)")
     add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
     return parser
 
@@ -206,6 +209,18 @@ def _voice(args: argparse.Namespace) -> int:
         print("  ! " + p)
     print(f"commentary audio: {wav} ({len(lines)} lines spoken)")
     return 0 if lines else 1
+
+
+def _run(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.run import run_all
+
+    setup_logging()
+    results = run_all(load_config(), args.video, set(args.fresh), args.voice)
+    for r in results:
+        print(f"{r.name:11s} {r.status:8s} {r.seconds:7.0f} s  {r.note}")
+    return 1 if any(r.status == "failed" for r in results) else 0
 
 
 def _render(args: argparse.Namespace) -> int:
