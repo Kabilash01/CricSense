@@ -72,3 +72,18 @@ fielder, the ball or a close-up, so the running is mostly off screen. Runs, boun
 wickets are therefore read from the score bar (labelled so), and the score engine's checks on
 score and overs are consistency checks, not independent measurements; strike rotation,
 balls faced and bowler figures are the genuinely tested parts.
+
+## Wides by vision: measured, not good enough to ship
+
+Evaluation set: the 5 wides of India's innings (found by the score bar over the whole
+broadcast) and 15 random legal balls, each cut as a clip and run through the vision passes
+with no clicks (`scripts/wide_eval.py`, results in outputs/wide_eval.json).
+- Pipeline on new clips: calibrated 16/20 (one clip has no pitch view), delivery found 14/16.
+- Only 3 of the 5 wides got a lateral measurement, and the measurement is not trustworthy:
+  three legal balls came out 1.3, 1.7 and 2.75 m from the middle-stump line (a wide by any
+  rule), one wide 0.3 m outside off, one wide with bat contact. The track near the batter is
+  sometimes another object (a throw, a replay), and the T20 wide also depends on where the
+  batter moved to, which the broadcast view does not show well.
+Wides stay read from the score bar. What it would take: the ball tracked reliably past the
+batter (more labelled frames of this part of the flight; 50 fps footage), the batter's final
+position, and more wides to test on (5 per innings; several matches).
