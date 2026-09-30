@@ -22,11 +22,13 @@ from cricsense.ball.candidates import detect_candidates
 from cricsense.config import Config
 from cricsense.fuse.contact import find_contact
 from cricsense.fuse.outcome import outcome, trusted_states
+from cricsense.fuse.score_engine import score_innings
 from cricsense.identity.match_sheet import MatchSheet
 from cricsense.io import read_doc, write_doc
 from cricsense.schema import (
     BallDoc,
     Event,
+    MatchDoc,
     EventsDoc,
     EventType,
     PlayersDoc,
@@ -89,15 +91,19 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
         )
 
     releases = [d.release_t for d in ball.deliveries]
+    per_ball = []
     for i, d in enumerate(ball.deliveries):
         nxt = releases[i + 1] if i + 1 < len(releases) else None
         res = outcome(states, d.release_t, nxt) if states else None
+        per_ball.append((d.delivery_id, d.release_frame, d.release_t, res))
         actors = actors_at(d.release_frame)
         names = {}
         if res:
             names = {"bowler": res.bowler, "striker": res.striker}
             names["over"] = f"{res.before.legal_balls // 6}.{res.before.legal_balls % 6 + 1}"
         speed = {"radar_speed_kph": d.radar_speed_kph} if d.radar_speed_kph else {}
+        if d.speed_estimate_kph and d.bounce_confirmed:  # shown as "≈", always labelled an estimate
+            speed["speed_estimate_kph"] = round(d.speed_estimate_kph)
         add(d.release_frame, EventType.RELEASE, 0.8, "ball.delivery", {"delivery_id": d.delivery_id, **names, **speed}, actors)
         bounce_frame = None
         if d.bounce_t is not None:
@@ -132,7 +138,7 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
             add(centre + 5, EventType.CONTACT, 0.8, "scoreboard", {"delivery_id": d.delivery_id, "evidence": "runs off the bat"}, actors)
         if res is None:
             continue
-        at = int(round(res.after.t * fps))
+        at = int(round((res.settled_t if res.settled_t is not None else res.after.t) * fps))
         score = f"{res.after.runs}-{res.after.wickets}"
         add(
             at,
@@ -164,6 +170,8 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
     doc = EventsDoc(video=ball.video, run=run, events=events)
     path = write_doc(doc, out_dir / "events.json")
     log.info("wrote %s: %d events", path, len(events))
+    match = MatchDoc(video=ball.video, run=run, states=score_innings(per_ball, states, fps))
+    write_doc(match, out_dir / "match.json")
     return doc, path
 
 
@@ -192,9 +200,41 @@ def summarize(doc: EventsDoc, path: Path) -> list[str]:
             elif e.type in (EventType.WICKET, EventType.WIDE, EventType.NO_BALL):
                 parts.append(e.type.value)
         if rel and rel.payload.get("radar_speed_kph"):
-            parts.append(f"{rel.payload['radar_speed_kph']:g} km/h")
+            parts.append(f"{rel.payload['radar_speed_kph']:g} km/h (radar)")
+        if rel and rel.payload.get("speed_estimate_kph"):
+            parts.append(f"≈{rel.payload['speed_estimate_kph']} km/h (estimate)")
         if not any(e.type == EventType.RUNS for e in evs):
             parts.append("no clean score-bar update before the next ball / end of clip")
         lines.append(f"{head}: " + ", ".join(parts))
     lines.append(f"events: {path}")
+    match_path = path.parent / "match.json"
+    if match_path.is_file():
+        lines += summarize_match(read_doc(match_path, MatchDoc), match_path)
+    return lines
+
+
+def _figures(f: tuple[int, int, int] | None) -> str:
+    if f is None:
+        return ""
+    runs, balls, wkts = f
+    return f"{wkts}-{runs} ({balls // 6}.{balls % 6})"
+
+
+def summarize_match(doc: MatchDoc, path: Path) -> list[str]:
+    lines = ["", "score engine (engine state after each ball; checks against the score bar):"]
+    passed = total = 0
+    for st in doc.states:
+        failed = [k for k, ok in st.checks.items() if not ok]
+        passed += sum(st.checks.values())
+        total += len(st.checks)
+        tag = {"engine": "", "resync": "  [RESYNC]", "no_evidence": "  [no evidence]"}[st.source]
+        on = f"{st.striker.title()}*" if st.striker else "?"
+        lines.append(
+            f"  {st.over:>5}  {st.runs}-{st.wickets}  {on} {st.non_striker.title() if st.non_striker else '?'}  "
+            f"{(st.bowler or '?').title()} {_figures(st.bowlers.get(st.bowler))}"
+            f"  checks {sum(st.checks.values())}/{len(st.checks)}" + (f"  FAILED: {', '.join(failed)}" if failed else "") + tag
+        )
+        for n in st.notes:
+            lines.append(f"         note: {n}")
+    lines.append(f"  all checks: {passed}/{total} agree with the score bar   match state: {path}")
     return lines

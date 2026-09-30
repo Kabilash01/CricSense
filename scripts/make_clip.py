@@ -7,7 +7,8 @@ and benchmarked on short clips of delivery sequences cut with this script.
         --start 00:50:00 --duration 60 --name final_0050
 
 Writes data/<name>.mp4 by default. Re-encodes rather than stream-copying so the clip
-starts on the exact requested frame instead of the nearest keyframe.
+starts on the exact requested frame instead of the nearest keyframe. The clip is video-only;
+its source and offset go into configs/clips.yaml, where the render finds the stadium sound.
 """
 
 from __future__ import annotations
@@ -17,6 +18,10 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import yaml
+
+CLIPS_YAML = Path(__file__).resolve().parents[1] / "configs" / "clips.yaml"
 
 
 def parse_time(value: str) -> float:
@@ -69,8 +74,17 @@ def main(argv: list[str] | None = None) -> int:
     out = args.out_dir / f"{name}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(build_command(args.video, args.start, duration, out), check=True)
+    record_source(name, args.video, args.start)
     print(out)
     return 0
+
+
+def record_source(name: str, video: Path, start: float) -> None:
+    raw = yaml.safe_load(CLIPS_YAML.read_text()) if CLIPS_YAML.is_file() else None
+    raw = raw or {}
+    raw.setdefault("clips", {})[name] = {"source": str(video), "start_s": round(start, 3)}
+    header = "".join(line + "\n" for line in CLIPS_YAML.read_text().splitlines() if line.startswith("#")) if CLIPS_YAML.is_file() else ""
+    CLIPS_YAML.write_text(header + yaml.safe_dump(raw, sort_keys=True))
 
 
 if __name__ == "__main__":

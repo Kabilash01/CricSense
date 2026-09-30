@@ -6,8 +6,10 @@
 # bar never shows the keeper; check it against the team sheet for any other match.
 teams:
   IND:
+    name: India
     squad: [ROHIT, KOHLI, PANT, SURYAKUMAR, DUBE, HARDIK, JADEJA, AXAR, KULDEEP, BUMRAH, ARSHDEEP]
     keeper: PANT
   SA:
+    name: South Africa
     squad: [DE KOCK, HENDRICKS, MARKRAM, STUBBS, KLAASEN, MILLER, JANSEN, MAHARAJ, RABADA, NORTJE, SHAMSI]
     keeper: DE KOCK

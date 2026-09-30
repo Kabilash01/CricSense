@@ -1,4 +1,11 @@
 from cricsense.schema.models import (
+    BatterAction,
+    PoseDoc,
+    PoseFrame,
+    CommentaryDoc,
+    CommentaryLine,
+    BallState,
+    MatchDoc,
     SCHEMA_VERSION,
     BallDoc,
     BallFrame,
@@ -23,6 +30,13 @@ from cricsense.schema.models import (
 )
 
 __all__ = [
+    "BatterAction",
+    "PoseDoc",
+    "PoseFrame",
+    "CommentaryDoc",
+    "CommentaryLine",
+    "BallState",
+    "MatchDoc",
     "SCHEMA_VERSION",
     "BallDoc",
     "BallFrame",

@@ -4,6 +4,12 @@ detector:
   imgsz: 1920                    # native resolution: the ball is 6-15 px, downscaling loses it
   conf: 0.1                      # candidates; the delivery tracker decides what is the ball
   min_track_conf: 0.15
+  # Fine-tuned on this broadcast (scripts/finetune_ball.py): far fewer false balls on crease
+  # marks, but it misses some deliveries. So the model above finds each delivery and this one,
+  # where it also finds it, gives the track - release time, bounce and our speed estimate.
+  # On the held-out 6-minute clip: deliveries 10/10, bounces 9 (8 and 6 for either model
+  # alone), estimate vs radar median 6% (61% from the model above). Remove to use one model.
+  track_weights: models/ball_ft.pt
 
 # Length zones by distance of the bounce from the striker's stumps (metres), as commonly
 # used for pace bowling. Spinners' good length is fuller; the metres are reported either way.

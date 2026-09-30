@@ -100,3 +100,17 @@ def test_delivery_found_with_bounce_and_speed(velocity):
     true_kph = np.linalg.norm(velocity) * 3.6
     # release is only known to the frame; the estimate is honest about that (+-15%)
     assert abs(d.speed_estimate_kph / true_kph - 1) < 0.15
+
+
+def test_precise_track_preferred_unless_only_the_other_has_a_bounce():
+    from types import SimpleNamespace
+
+    from cricsense.passes.ball import prefer_precise
+
+    with_bounce, no_bounce = SimpleNamespace(bounce=object()), SimpleNamespace(bounce=None)
+    assert prefer_precise(no_bounce, with_bounce)
+    assert prefer_precise(with_bounce, with_bounce)
+    assert prefer_precise(None, no_bounce)  # only the precise model found the delivery
+    assert prefer_precise(no_bounce, no_bounce)
+    assert not prefer_precise(with_bounce, no_bounce)  # keep the track that has the bounce
+    assert not prefer_precise(with_bounce, None)

@@ -1,0 +1,25 @@
+# Commentary: from the fact sheets only (cricsense.commentary.facts).
+engine: auto            # auto: the LLM when an API key is found, else templates | llm | template
+
+llm:                    # keys come from the environment or the gitignored .env, never from here
+  provider: openai      # anthropic | gemini | openai (any OpenAI-compatible endpoint: set base_url)
+  base_url: https://lightning.ai/api/v1   # Lightning AI model APIs (free credits)
+  key_env: LIGHTNING_API_KEY
+  model: google/gemini-3.1-flash-lite-preview
+  style: lively, warm, broadcast TV; varied phrasing; short sentences that read well aloud
+  # Gemini direct: provider gemini, model gemini-3.8-flash, key GEMINI_API_KEY (no base_url / key_env)
+
+vlm:                    # shot type and direction from frames around bat contact
+  enabled: true
+  provider: openai
+  base_url: https://lightning.ai/api/v1
+  key_env: LIGHTNING_API_KEY
+  model: google/gemini-3.5-flash   # vision needs a stronger model than flash-lite (it saw sweeps against 128 kph pace)
+
+max_words:              # caps; the time before the next ball can make them smaller
+  ball: 22
+  after: 24
+
+tts:                    # Gemini TTS (free tier): needs GEMINI_API_KEY - Lightning AI has no speech API
+  model: gemini-3.8-flash-tts
+  voice: Sadaltager     # "knowledgeable"; others: Fenrir (excitable), Puck (upbeat), Charon (informative)

@@ -27,6 +27,10 @@ class ScoreState:
     legal_balls: int
     bowler: str
     batters: tuple[tuple[str, int, int, bool], ...]  # (name, runs, balls, on strike)
+    # the bowler's figures as shown; noisier than the score, so not part of what must be stable
+    bowler_runs: int | None = None
+    bowler_legal_balls: int | None = None
+    bowler_wickets: int | None = None
 
     @property
     def striker(self) -> tuple[str, int, int, bool] | None:
@@ -49,6 +53,8 @@ class Outcome:
     wicket: bool
     kind: str  # "legal" | "wide" | "no_ball"
     boundary: str | None  # "FOUR" | "SIX"
+    # when the bar first showed the new score (later states may only change the bowler shown)
+    settled_t: float | None = None
 
 
 def trusted_states(readings: list[ScoreboardReading], squad: set[str]) -> list[ScoreState]:
@@ -62,7 +68,17 @@ def trusted_states(readings: list[ScoreboardReading], squad: set[str]) -> list[S
         if sum(b.on_strike for b in r.batters) != 1:
             continue
         candidates.append(
-            ScoreState(r.t, r.runs, r.wickets, r.legal_balls, r.bowler, tuple((b.name, b.runs, b.balls, b.on_strike) for b in r.batters))
+            ScoreState(
+                r.t,
+                r.runs,
+                r.wickets,
+                r.legal_balls,
+                r.bowler,
+                tuple((b.name, b.runs, b.balls, b.on_strike) for b in r.batters),
+                r.bowler_runs,
+                r.bowler_legal_balls,
+                r.bowler_wickets,
+            )
         )
     states: list[ScoreState] = []
     run: list[ScoreState] = []
@@ -124,4 +140,6 @@ def outcome(states: list[ScoreState], release_t: float, next_release_t: float | 
     else:
         return None  # nothing changed yet
     boundary = {4: "FOUR", 6: "SIX"}.get(off_bat)
-    return Outcome(before, after, name, before.bowler, d_runs, off_bat, d_runs - off_bat, d_wkts > 0, kind, boundary)
+    core = (after.runs, after.wickets, after.legal_balls)
+    settled = min(s.t for s in after_candidates if (s.runs, s.wickets, s.legal_balls) == core)
+    return Outcome(before, after, name, before.bowler, d_runs, off_bat, d_runs - off_bat, d_wkts > 0, kind, boundary, settled)

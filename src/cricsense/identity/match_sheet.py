@@ -13,6 +13,11 @@ class Team:
     code: str
     squad: tuple[str, ...]
     keeper: str | None
+    name: str = ""  # "India"; the code when not given
+
+    @property
+    def display(self) -> str:
+        return self.name or self.code
 
 
 @dataclass(frozen=True)
@@ -23,7 +28,7 @@ class MatchSheet:
     def from_yaml(cls, path: Path) -> MatchSheet:
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         teams = tuple(
-            Team(code=code, squad=tuple(t.get("squad") or ()), keeper=t.get("keeper"))
+            Team(code=code, squad=tuple(t.get("squad") or ()), keeper=t.get("keeper"), name=t.get("name") or "")
             for code, t in (raw.get("teams") or {}).items()
         )
         if len(teams) != 2:

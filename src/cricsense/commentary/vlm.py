@@ -1,0 +1,101 @@
+"""Shot type and direction from frames around bat contact, by a vision-language model.
+
+Asked for a shot name directly, the models tried here guess (one called every shot a
+"sweep", including upright drives it described correctly when asked what it saw). So the
+model only describes what is visible - knee on the ground, stance, front or back foot, how
+the bat finishes, which side the ball goes - and the shot is named from that by the rules
+below, which are the textbook definitions. What comes out is marked shot_source "vlm" in the
+facts, never presented as a measurement; if the posture is unclear nothing is named.
+"""
+
+from __future__ import annotations
+
+import json
+
+import cv2
+import numpy as np
+
+from cricsense.commentary.llm import Cache, LLMConfig, complete, parse_json
+from cricsense.io import VideoReader
+
+FRAME_OFFSETS = (-2, 2, 6, 12)  # around bat contact
+WIDTH = 960
+SIDES = ("off", "leg", "straight")
+
+PROMPT = """These are frames from a cricket broadcast, in time order, around the moment the batter plays the ball.
+The first frames are close crops on the batter; the last is the wide view just after the shot.
+Describe only what you can see of the batter - do not name the shot.
+Return JSON only:
+{"knee_on_ground": true | false | null, "stance": "upright" | "crouched" | "kneeling" | "unclear",
+ "foot": "front" | "back" | "unclear", "bat_finish": "high" | "low" | "unclear",
+ "ball_side": "off" | "leg" | "straight" | "unclear", "clear": 0.0-1.0 (how clearly the frames show all this)}"""
+
+MIN_CLEAR = 0.5
+
+
+def name_shot(o: dict) -> str | None:
+    """The shot, by the textbook, from what the model saw; None if it cannot be told."""
+    side, foot = o.get("ball_side"), o.get("foot")
+    high = o.get("bat_finish") == "high"
+    kneeling = o.get("knee_on_ground") is True or o.get("stance") == "kneeling"
+    if side not in SIDES:
+        return None
+    if kneeling:
+        return {"leg": "slog sweep" if high else "sweep", "off": "reverse sweep", "straight": "slog sweep"}[side]
+    if o.get("stance") not in ("upright", "crouched"):
+        return None
+    if foot == "front":
+        return {"straight": "straight drive", "off": "cover drive", "leg": "flick"}[side]
+    if foot == "back":
+        return {"straight": "back-foot punch", "off": "cut" if not high else "back-foot punch", "leg": "pull"}[side]
+    return {"straight": "straight drive", "off": "drive", "leg": "clip to leg"}[side]
+
+
+CROP = 640  # side of the square crop around the batter, in the frame's pixels
+
+
+def contact_frames(video, centre: int, striker_box=None) -> list[bytes]:
+    """JPEGs around bat contact. striker_box(frame) -> (x1, y1, x2, y2) | None: where a box is
+    known the frame is cropped on the batter (at full resolution the batter is ~250 px tall;
+    a whole frame shrunk for the model leaves ~100 px); the last frame stays wide, for direction."""
+    wanted = {centre + d for d in FRAME_OFFSETS}
+    last = max(wanted)
+    out = {}
+    with VideoReader(video, start=max(0, min(wanted)), end=last + 1) as reader:
+        for f in reader:
+            if f.frame_id not in wanted:
+                continue
+            img = f.image[: int(0.85 * f.image.shape[0])]  # leave out the score bar
+            box = striker_box(f.frame_id) if striker_box and f.frame_id != last else None
+            if box is not None:
+                cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+                half = max(CROP, int(2.2 * (box[3] - box[1]))) // 2
+                h, w = img.shape[:2]
+                x0, y0 = int(np.clip(cx - half, 0, max(w - 2 * half, 0))), int(np.clip(cy - half, 0, max(h - 2 * half, 0)))
+                img = img[y0 : y0 + 2 * half, x0 : x0 + 2 * half]
+                img = cv2.resize(img, (768, 768), interpolation=cv2.INTER_AREA if img.shape[0] > 768 else cv2.INTER_CUBIC)
+            else:
+                h, w = img.shape[:2]
+                img = cv2.resize(img, (WIDTH, int(h * WIDTH / w)), interpolation=cv2.INTER_AREA)
+            out[f.frame_id] = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 88])[1].tobytes()
+    return [out[k] for k in sorted(out)]
+
+
+def read_shot(cfg: LLMConfig, key: str, frames: list[bytes], cache: Cache) -> dict | None:
+    """{"shot", "direction", "observed"} if the frames show it clearly, else None."""
+    if not frames:
+        return None
+    k = cache.key("vlm-posture", cfg.provider, cfg.model, PROMPT, [np.frombuffer(f, np.uint8).sum() % 1_000_003 for f in frames])
+    reply = cache.get(k)
+    if reply is None:
+        reply = complete(cfg, key, "You describe cricket video frames. Answer only with the JSON asked for.", PROMPT, frames)
+        cache.put(k, reply)
+    try:
+        o = parse_json(reply)
+        clear = float(o.get("clear", 0))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+    shot = name_shot(o)
+    if shot is None or clear < MIN_CLEAR:
+        return None
+    return {"shot": shot, "direction": f"{o['ball_side']} side" if o["ball_side"] != "straight" else "straight", "observed": o}

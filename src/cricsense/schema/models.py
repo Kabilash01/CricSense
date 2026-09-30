@@ -113,6 +113,7 @@ class Delivery(_Strict):
     radar_speed_kph: float | None = Field(default=None, gt=0)
     # our own estimate from release and bounce timing; single-camera, see ball/physics.py
     speed_estimate_kph: float | None = Field(default=None, gt=0)
+    track_model: str | None = None  # weights file whose detections gave the track
 
 
 class Event(_Strict):
@@ -312,3 +313,99 @@ class CameraDoc(_PassDoc):
     def _timing(self) -> CameraDoc:
         self._check_timing(self.frames)
         return self
+
+
+class BallState(_Strict):
+    """The score engine's match state after one delivery, and how it squares with the score bar."""
+
+    delivery_id: NonNegativeInt
+    frame_id: NonNegativeInt  # when the state holds: the ball's outcome, or its release if unknown
+    t: NonNegativeFloat
+    over: str  # "11.5": completed overs . balls
+    runs: NonNegativeInt
+    wickets: int = Field(ge=0, le=10)
+    legal_balls: NonNegativeInt
+    striker: str | None
+    non_striker: str | None
+    bowler: str | None
+    batters: dict[str, tuple[int, int]]  # name -> (runs, balls faced)
+    bowlers: dict[str, tuple[int, int, int]]  # name -> (runs conceded, legal balls, wickets)
+    # "engine": updated by the laws from this ball's outcome; "resync": the engine had no evidence
+    # for a ball before this one and took the score bar's state; "no_evidence": unchanged
+    source: Literal["engine", "resync", "no_evidence"]
+    checks: dict[str, bool] = Field(default_factory=dict)  # engine vs score bar, check by check
+    notes: list[str] = Field(default_factory=list)
+
+
+class MatchDoc(_PassDoc):
+    """outputs/<video_id>/match.json: the score engine's ball-by-ball state."""
+
+    pass_name: Literal["score"] = "score"
+    states: list[BallState]
+
+    @model_validator(mode="after")
+    def _timing(self) -> MatchDoc:
+        self._check_timing(self.states)
+        return self
+
+
+class CommentaryLine(_Strict):
+    delivery_id: NonNegativeInt
+    frame_id: NonNegativeInt  # when the line starts
+    t: NonNegativeFloat
+    kind: Literal["ball", "after"]  # as the ball is played / after it (score, over, milestone)
+    text: str = Field(min_length=1)
+    source: Literal["template", "llm"]
+    fallback_reason: str | None = None  # why an LLM line was replaced by the template
+    max_s: PositiveFloat  # time available before the next line or ball
+
+
+class CommentaryDoc(_PassDoc):
+    """outputs/<video_id>/commentary.json: lines, and the fact sheets they were written from."""
+
+    pass_name: Literal["commentary"] = "commentary"
+    engine: str  # "template" or "<provider>:<model>"
+    lines: list[CommentaryLine]
+    facts: list[dict[str, Any]]
+
+    @model_validator(mode="after")
+    def _timing(self) -> CommentaryDoc:
+        self._check_timing(self.lines)
+        return self
+
+
+class PoseFrame(_Strict):
+    """COCO-17 keypoints of one player in one frame: (x, y, confidence) in image pixels."""
+
+    frame_id: NonNegativeInt
+    t: NonNegativeFloat
+    sid: PositiveInt
+    role: Role
+    keypoints: list[tuple[float, float, float]] = Field(min_length=17, max_length=17)
+
+
+class BatterAction(_Strict):
+    """What the striker's body did on one delivery, measured from pose on the calibrated pitch."""
+
+    delivery_id: NonNegativeInt
+    sid: PositiveInt | None
+    footwork: Literal["front foot", "back foot", "in the crease"] | None  # None: feet not seen well enough
+    stride_m: float | None  # + towards the bowler (front foot), - back towards the stumps
+    swing: Literal["played", "left"] | None
+    swing_peak_frame: NonNegativeInt | None
+    hand_speed: float | None  # peak wrist speed, body heights per second
+    frames: NonNegativeInt  # frames with the striker's pose
+
+
+class PoseDoc(_PassDoc):
+    """outputs/<video_id>/pose.json: striker keypoints around each delivery and what they show."""
+
+    pass_name: Literal["pose"] = "pose"
+    frames: list[PoseFrame]
+    batters: list[BatterAction]
+
+    @model_validator(mode="after")
+    def _timing(self) -> PoseDoc:
+        self._check_timing(self.frames)
+        return self
+

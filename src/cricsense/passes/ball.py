@@ -3,6 +3,11 @@
 Per main-view camera shot (camera.json): ball candidates from the detector, the delivery
 found among them (cricsense.ball.delivery), the bounce and length/line from it, the radar
 speed the broadcaster showed after the ball (scoreboard.json), and our own speed estimate.
+
+With a second, precise model (detector.track_weights) the first model decides whether a shot
+has a delivery and the precise one gives the track wherever it finds the delivery too (and a
+bounce, unless neither does). Only precise tracks get a speed estimate: the first model's
+false detections near the bowler make its release time, and so its speed, unreliable.
 """
 
 from __future__ import annotations
@@ -69,6 +74,12 @@ def radar_per_shot(readings, shots: list[list[int]], fps: float) -> dict[int, fl
     return out
 
 
+def prefer_precise(found, precise) -> bool:
+    """Use the precise model's track for this shot? Yes when it found the delivery, unless only
+    the first model's track has a bounce."""
+    return precise is not None and (precise.bounce is not None or found is None or found.bounce is None)
+
+
 def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool = False) -> tuple[BallDoc, Path]:
     bcfg = cfg.ball
     det = bcfg["detector"]
@@ -88,19 +99,37 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
 
     t0 = time.perf_counter()
     cands = detect_candidates(video, set(geo), weights, out_dir, det["imgsz"], det["conf"], cfg.device, fresh)
+    track_weights = cfg.root / det["track_weights"] if det.get("track_weights") else None
+    if track_weights is not None and not track_weights.is_file():
+        log.warning("track model %s not found; using %s alone", track_weights, weights.name)
+        track_weights = None
+    track_cands = (
+        detect_candidates(video, set(geo), track_weights, out_dir, det["imgsz"], det["conf"], cfg.device, fresh)
+        if track_weights is not None
+        else None
+    )
     shots = shots_of(sorted(geo))
     radar = radar_per_shot(readings, shots, fps)
 
     frames_out: list[BallFrame] = []
     deliveries: list[Delivery] = []
-    for shot in shots:
-        cs = [
+    def candidates(source: dict[int, list[dict]], shot: list[int]) -> list[Candidate]:
+        return [
             Candidate(f, f / fps, (d["box"][0] + d["box"][2]) / 2, (d["box"][1] + d["box"][3]) / 2, d["conf"])
             for f in shot
-            for d in cands.get(f, [])
+            for d in source.get(f, [])
             if d["cls"] == 0 and d["conf"] >= det["min_track_conf"] and (d["box"][1] + d["box"][3]) / 2 < 0.85 * height
         ]
-        found = find_delivery(cs, geo, fps)
+
+    for shot in shots:
+        found = find_delivery(candidates(cands, shot), geo, fps)
+        model, estimate = weights.name, found.speed_estimate_kph if found is not None else None
+        if track_cands is not None:
+            precise = find_delivery(candidates(track_cands, shot), geo, fps)
+            if prefer_precise(found, precise):
+                found, model, estimate = precise, track_weights.name, precise.speed_estimate_kph
+            else:
+                estimate = None
         if found is None:
             continue
         did = len(deliveries)
@@ -132,7 +161,8 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
                 line_m=None if b is None else b.y,
                 length_class=None if b is None else zones.classify(b.x),
                 radar_speed_kph=radar.get(shot[0]),
-                speed_estimate_kph=found.speed_estimate_kph,
+                speed_estimate_kph=estimate,
+                track_model=model,
             )
         )
     frames_out.sort(key=lambda f: f.frame_id)
@@ -146,7 +176,7 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
 def summarize(doc: BallDoc, path: Path) -> list[str]:
     lines = []
     for d in doc.deliveries:
-        parts = [f"delivery {d.delivery_id}: release frame {d.release_frame}, {d.detections} detections"]
+        parts = [f"delivery {d.delivery_id}: release frame {d.release_frame}, {d.detections} detections ({d.track_model})"]
         if d.length_m is not None:
             parts.append(
                 f"bounce length {d.length_m:.2f} m ({d.length_class.value}), line {d.line_m:+.2f} m"

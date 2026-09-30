@@ -10,7 +10,6 @@ from pathlib import Path
 
 # Subcommand -> the build phase that implements it. Removed from here as each phase lands.
 _PENDING_PHASE = {
-    "render": 5,
     "live": 7,
 }
 
@@ -75,9 +74,19 @@ def build_parser() -> argparse.ArgumentParser:
     bl.add_argument("--weights", type=Path, help="ball model (default: configs/ball.yaml detector.weights)")
     bl.add_argument("--fresh", action="store_true", help="re-run the detector instead of using cached candidates")
     bl.add_argument("--device", help="override configs/default.yaml device, e.g. cpu or cuda:0")
+    po = add("pose", "the striker's body on each delivery: footwork and swing -> pose.json", _pose, video=True)
+    po.add_argument("--device", help="override configs/default.yaml device, e.g. cpu or cuda:0")
     fu = add("fuse", "event timeline: release, bounce, bat contact, runs, boundaries, wickets, wides -> events.json", _fuse, video_id=True)
     fu.add_argument("--device", help="override configs/default.yaml device for the bat detector")
-    add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", video_id=True)
+    co = add("commentary", "commentary lines per ball from the facts (LLM checked against them, or templates) -> commentary.json", _commentary, video_id=True)
+    co.add_argument("--engine", choices=["auto", "llm", "template"], help="default: configs/commentary.yaml engine")
+    co.add_argument("--no-vlm", action="store_true", help="skip shot type / direction from the vision model")
+    add("voice", "speak the commentary (Gemini TTS) -> commentary.wav + voice.json", _voice, video_id=True)
+    rn = add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", _render, video_id=True)
+    rn.add_argument("--start", type=float, help="first second to render (default: the start)")
+    rn.add_argument("--end", type=float, help="last second to render (default: the end)")
+    rn.add_argument("--out-name", default="overlay.mp4", help="output file name inside outputs/<video_id>/")
+    rn.add_argument("--no-voice", action="store_true", help="leave the commentary audio and captions out")
     add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
     return parser
 
@@ -146,6 +155,17 @@ def _ball(args: argparse.Namespace) -> int:
     return 0
 
 
+def _pose(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.pose import run_pose, summarize
+
+    setup_logging()
+    doc, path = run_pose(load_config(), args.video, args.device)
+    print("\n".join(summarize(doc, path)))
+    return 0
+
+
 def _fuse(args: argparse.Namespace) -> int:
     from cricsense.config import load_config
     from cricsense.io import setup_logging
@@ -157,6 +177,43 @@ def _fuse(args: argparse.Namespace) -> int:
         cfg = dataclasses.replace(cfg, device=args.device)
     doc, path = run_fuse(cfg, args.video_id)
     print("\n".join(summarize(doc, path)))
+    return 0
+
+
+def _commentary(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.commentary import run_commentary, summarize
+
+    setup_logging()
+    doc, path = run_commentary(load_config(), args.video_id, args.engine, False if args.no_vlm else None)
+    print("\n".join(summarize(doc, path)))
+    return 0
+
+
+def _voice(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.voice import run_voice
+
+    setup_logging()
+    wav, lines, problems = run_voice(load_config(), args.video_id)
+    for line in lines:
+        print(f"{line['start_s']:7.1f}-{line['end_s']:6.1f}s  {line['text']}")
+    for p in problems:
+        print("  ! " + p)
+    print(f"commentary audio: {wav} ({len(lines)} lines spoken)")
+    return 0 if lines else 1
+
+
+def _render(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.render import run_render
+
+    setup_logging()
+    video, pitch_map, n = run_render(load_config(), args.video_id, args.start, args.end, args.out_name, not args.no_voice)
+    print(f"overlay: {video} ({n} frames)\npitch map: {pitch_map}")
     return 0
 
 

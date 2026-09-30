@@ -1,0 +1,11 @@
+# Pose pass: the striker's body around each delivery (the bowler's end is too far and too
+# foreshortened for a front-foot no-ball verdict - see docs/decisions.md).
+model: models/yolo11x-pose.pt   # COCO-17 keypoints
+imgsz: 640                       # on a crop around the striker, not the whole frame
+crop_scale: 1.9                  # crop side = this x the striker box height
+conf: 0.3
+window: [-3, 22]                 # frames around release .. after the bounce (contact is ~0.4-0.8 s after release)
+thresholds:
+  stride_front_m: 0.30           # front foot moved this far towards the bowler
+  stride_back_m: 0.20            # back foot moved this far towards the stumps
+  swing_speed: 1.6               # wrists faster than this (body heights / s): the ball was played

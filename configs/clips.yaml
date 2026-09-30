@@ -1,0 +1,7 @@
+# Where each dev clip was cut from (scripts/make_clip.py adds an entry per clip).
+# The clips are video-only; the render takes the stadium sound from the source at this offset.
+# Offsets were matched frame by frame against the broadcast (the clip names are not the start).
+clips:
+  final_0050_10s: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 3000.0}
+  final_0051_6min: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 3055.0}
+  final_0051_30s: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 3058.0}

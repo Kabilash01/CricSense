@@ -7,7 +7,7 @@ resolved against the repo root, so a clean clone runs without editing anything.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +55,7 @@ class Config:
     camera: CameraOptions
     players: dict[str, Any]  # typed in Phase 2
     ball: dict[str, Any]  # typed in Phase 3
+    commentary: dict[str, Any] = field(default_factory=dict)
 
     def output_dir_for(self, video_id: str) -> Path:
         return self.paths.output_dir / video_id
@@ -110,6 +111,7 @@ def load_config(root: Path | None = None) -> Config:
         camera=_camera_options(default.get("camera") or {}),
         players=_read_yaml(configs / "players.yaml"),
         ball=_read_yaml(configs / "ball.yaml"),
+        commentary=_read_yaml(configs / "commentary.yaml") if (configs / "commentary.yaml").is_file() else {},
     )
 
 
