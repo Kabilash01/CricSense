@@ -105,7 +105,7 @@ def run_calibrate(
     propagate_only: bool = False,
     import_views: Path | None = None,
     auto: bool = False,
-    auto_step_s: float = 2.0,
+    auto_step_s: float | None = None,
 ) -> CalibrateResult:
     video_id = video_id_from_path(video)
     resize = cfg.video.resize
@@ -121,7 +121,9 @@ def run_calibrate(
             raise CalibrationError(f"{cal_path} does not exist; calibrate a reference view first")
         calibration = existing
     elif auto:
-        calibration, check_path = _auto_views(cfg, video, meta, auto_step_s, out_dir)
+        # dense enough that a short clip still yields a few frames of each view, sparse for a match
+        step = auto_step_s if auto_step_s is not None else min(2.0, max(0.5, meta.n_frames / meta.fps / 150))
+        calibration, check_path = _auto_views(cfg, video, meta, step, out_dir)
         write_yaml_doc(calibration, cal_path)
         log.info("wrote %s with %d automatic views", cal_path, len(calibration.views))
     elif import_views is not None:

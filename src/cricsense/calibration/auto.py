@@ -225,9 +225,32 @@ def calibrate(img: np.ndarray, bottom: float = 0.85) -> AutoCalibration | None:
     if best is None:
         return None
     s, H, corners = _refine(best, dist, bottom_px, model, mask)
-    if s < MIN_SCORE or not _real_camera(H, (w, h)):
+    if s < MIN_SCORE or not _real_camera(H, (w, h)) or _pitch_ground(H, img, bottom_px) < MIN_PITCH_GROUND:
         return None
     return AutoCalibration(H, corners, s)
+
+
+MIN_PITCH_GROUND = 0.5
+
+
+def _pitch_ground(image_to_pitch: np.ndarray, img: np.ndarray, bottom_px: int) -> float:
+    """Share of the projected pitch (between the creases) that looks like pitch: rejects white
+    lines found on a stadium graphic, an advert or a dugout, which can repeat over many frames."""
+    P = np.linalg.inv(image_to_pitch)
+    corners = []
+    for x, y in ((pm.STRIKER_POPPING_X, -pm.PITCH_HALF_WIDTH), (pm.STRIKER_POPPING_X, pm.PITCH_HALF_WIDTH),
+                 (pm.BOWLER_POPPING_X, pm.PITCH_HALF_WIDTH), (pm.BOWLER_POPPING_X, -pm.PITCH_HALF_WIDTH)):
+        q = P @ np.array([x, y, 1.0])
+        if q[2] <= 0:
+            return 0.0
+        corners.append((q[0] / q[2], q[1] / q[2]))
+    poly = np.zeros(img.shape[:2], np.uint8)
+    cv2.fillPoly(poly, [np.array(corners, np.int32)], 1)
+    poly[bottom_px:] = 0
+    area = int(poly.sum())
+    if area < 200:
+        return 0.0
+    return float((pitch_colour(img) & poly).sum()) / area
 
 
 def _real_camera(image_to_pitch: np.ndarray, size: tuple[int, int]) -> bool:
@@ -263,7 +286,9 @@ def _refine(best, dist, bottom_px, model, mask, steps=(4.0, 2.0, 1.0, 0.5)):
     return s, H, dict(zip(CORNER_NAMES, map(tuple, pts)))
 
 
-ACCEPT = 0.78  # a frame this well explained by the regulation creases can anchor a view
+ACCEPT = 0.72  # a frame this well explained by the regulation creases can join a view
+STRONG = 0.78  # a view needs a frame this good and one more agreeing frame, or ...
+SUPPORTED = 3  # ... this many agreeing frames (a batter on a crease can fool one or two frames)
 SAME_VIEW_PX = 90  # corners this close (median): the same fixed camera
 
 
@@ -285,4 +310,8 @@ def find_views(frames: dict[int, np.ndarray], bottom: float = 0.85) -> list[tupl
                 break
         else:
             groups.append([(f, r)])
-    return [(g[0][0], g[0][1], len(g)) for g in groups if len(g) >= 2]
+    return [
+        (g[0][0], g[0][1], len(g))
+        for g in groups
+        if (len(g) >= 2 and g[0][1].score >= STRONG) or len(g) >= SUPPORTED
+    ]
