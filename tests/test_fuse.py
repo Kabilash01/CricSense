@@ -73,3 +73,18 @@ def test_contact_needs_the_ball_in_a_bat_box_near_the_striker():
     assert c is not None and c.frame_id == 105  # frame 104's "bat" is the score-bar icon
     assert find_contact(bats, balls, 100, (100, 100, 200, 300), (1920, 1080), overlays) is None  # not the striker's bat
     assert find_contact(bats, {}, 100, None, (1920, 1080), overlays) is None
+
+
+def test_a_new_innings_is_not_a_score_going_backwards():
+    team_of = {"KOHLI": "IND", "AXAR": "IND", "STUBBS": "SA", "DE KOCK": "SA", "SHAMSI": "SA", "BUMRAH": "IND"}
+    first = seen(0, 176, 7, 120, (76, 59), (47, 31))
+    second = [
+        ScoreboardReading(**{**r.model_dump(), "runs": 4, "wickets": 0, "legal_balls": 2, "bowler": "BUMRAH", "t": r.t + 3000,
+                             "frame_id": r.frame_id + 75000,
+                             "batters": [BatterLine(name="DE KOCK", runs=4, balls=1, on_strike=True),
+                                         BatterLine(name="STUBBS", runs=0, balls=1, on_strike=False)]})
+        for r in seen(0, 0, 0, 0, (0, 0), (0, 0))
+    ]
+    squad = SQUAD | {"STUBBS", "DE KOCK", "BUMRAH"}
+    assert [s.runs for s in trusted_states([*first, *second], squad)] == [176]  # without teams: rejected
+    assert [s.runs for s in trusted_states([*first, *second], squad, team_of)] == [176, 4]

@@ -57,8 +57,13 @@ class Outcome:
     settled_t: float | None = None
 
 
-def trusted_states(readings: list[ScoreboardReading], squad: set[str]) -> list[ScoreState]:
-    """Score-bar states that are complete, plausible and stable, in time order."""
+def trusted_states(
+    readings: list[ScoreboardReading], squad: set[str], team_of: dict[str, str] | None = None
+) -> list[ScoreState]:
+    """Score-bar states that are complete, plausible and stable, in time order.
+
+    team_of (player -> team) lets a new innings through: when the batters belong to the other
+    side, the score starting again from 0 is the second innings, not a misread going backwards."""
     candidates: list[ScoreState] = []
     for r in readings:
         if r.runs is None or r.wickets is None or r.legal_balls is None or r.bowler not in squad:
@@ -86,9 +91,9 @@ def trusted_states(readings: list[ScoreboardReading], squad: set[str]) -> list[S
         if run and _key(s) == _key(run[-1]):
             run.append(s)
         else:
-            _accept(run, states)
+            _accept(run, states, team_of)
             run = [s]
-    _accept(run, states)
+    _accept(run, states, team_of)
     return states
 
 
@@ -96,13 +101,20 @@ def _key(s: ScoreState) -> tuple:
     return (s.runs, s.wickets, s.legal_balls, s.bowler, s.batters)
 
 
-def _accept(run: list[ScoreState], states: list[ScoreState]) -> None:
+def batting_side(s: ScoreState, team_of: dict[str, str] | None) -> str | None:
+    teams = {team_of.get(b[0]) for b in s.batters} if team_of else set()
+    return teams.pop() if len(teams) == 1 else None
+
+
+def _accept(run: list[ScoreState], states: list[ScoreState], team_of: dict[str, str] | None = None) -> None:
     if len(run) < MIN_REPEATS:
         return
     s = run[0]
     if states:
         last = states[-1]
-        if s.runs < last.runs or s.wickets < last.wickets or s.legal_balls < last.legal_balls:
+        side, last_side = batting_side(s, team_of), batting_side(last, team_of)
+        new_innings = side is not None and last_side is not None and side != last_side
+        if not new_innings and (s.runs < last.runs or s.wickets < last.wickets or s.legal_balls < last.legal_balls):
             return  # a score never goes backwards: a misread
         if _key(s) == _key(last):
             return

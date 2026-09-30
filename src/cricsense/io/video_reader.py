@@ -24,6 +24,9 @@ class Frame:
     image: np.ndarray  # BGR
 
 
+MAX_BAD_FRAMES = 250  # 10 s at 25 fps
+
+
 class VideoReader:
     """Iterate frames [start, end) of a video, keeping every `skip`-th one.
 
@@ -70,15 +73,24 @@ class VideoReader:
         # Frame-accurate positioning: decode from 0 rather than trusting CAP_PROP_POS_FRAMES,
         # which lands on the nearest keyframe for many codecs.
         self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        bad = 0
         for frame_id in range(self.end):
             keep = frame_id >= self.start and (frame_id - self.start) % self.skip == 0
             if not keep:
-                if not self._cap.grab():
+                ok = self._cap.grab()
+            else:
+                ok, image = self._cap.read()
+            if not ok:
+                # Long broadcast recordings carry a few corrupt packets; the decoder recovers on
+                # the next one. Skip the lost frame (ids stay tied to time), and only stop when
+                # nothing decodes for MAX_BAD_FRAMES in a row: the real end, or a broken file.
+                bad += 1
+                if bad > MAX_BAD_FRAMES:
                     return
                 continue
-            ok, image = self._cap.read()
-            if not ok:
-                return
+            bad = 0
+            if not keep:
+                continue
             if self.resize is not None:
                 image = cv2.resize(image, self.resize, interpolation=cv2.INTER_LINEAR)
             yield Frame(frame_id=frame_id, t=frame_id / self.fps, image=image)

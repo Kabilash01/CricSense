@@ -46,12 +46,14 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
     players = read_doc(out_dir / "players.json", PlayersDoc) if (out_dir / "players.json").is_file() else None
     board = read_doc(out_dir / "scoreboard.json", ScoreboardDoc) if (out_dir / "scoreboard.json").is_file() else None
     sheet_path = cfg.root / "configs" / "match.yaml"
-    squad = set(MatchSheet.from_yaml(sheet_path).all_names) if sheet_path.is_file() else set()
+    sheet = MatchSheet.from_yaml(sheet_path) if sheet_path.is_file() else None
+    squad = set(sheet.all_names) if sheet else set()
+    team_of = {n: t.code for t in sheet.teams for n in t.squad} if sheet else None
     fps, n_frames = ball.video.fps, ball.video.n_frames
     size = (ball.video.width, ball.video.height)
     t0 = time.perf_counter()
 
-    states = trusted_states(board.readings, squad) if board else []
+    states = trusted_states(board.readings, squad, team_of) if board else []
     by_frame_role: dict[int, dict[Role, tuple[int, tuple]]] = defaultdict(dict)
     if players:
         for f in players.frames:
