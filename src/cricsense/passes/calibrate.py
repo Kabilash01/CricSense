@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 
 from cricsense.calibration import pitch_model
+from cricsense.calibration.auto import CORNER_NAMES, find_views
 from cricsense.calibration.camera_motion import read_frames, track_video
 from cricsense.calibration.homography import CalibrationError, reprojection_errors
 from cricsense.calibration.picker import PickerSession, draw_session, run_picker
@@ -103,6 +104,8 @@ def run_calibrate(
     propagate: bool = True,
     propagate_only: bool = False,
     import_views: Path | None = None,
+    auto: bool = False,
+    auto_step_s: float = 2.0,
 ) -> CalibrateResult:
     video_id = video_id_from_path(video)
     resize = cfg.video.resize
@@ -117,6 +120,10 @@ def run_calibrate(
         if existing is None:
             raise CalibrationError(f"{cal_path} does not exist; calibrate a reference view first")
         calibration = existing
+    elif auto:
+        calibration, check_path = _auto_views(cfg, video, meta, auto_step_s, out_dir)
+        write_yaml_doc(calibration, cal_path)
+        log.info("wrote %s with %d automatic views", cal_path, len(calibration.views))
     elif import_views is not None:
         calibration = _import_views(cfg, import_views, existing, video_id, (meta.width, meta.height), force)
         write_yaml_doc(calibration, cal_path)
@@ -158,6 +165,40 @@ def run_calibrate(
         camera_path = write_doc(camera, out_dir / "camera.json")
         log.info("wrote %s", camera_path)
     return CalibrateResult(cal_path, check_path, camera_path, view, camera)
+
+
+def _auto_views(cfg: Config, video: Path, meta, step_s: float, out_dir: Path) -> tuple[CalibrationDoc, Path]:
+    """Reference views without clicks: see cricsense.calibration.auto."""
+    step = max(1, int(round(step_s * meta.fps)))
+    frames = read_frames(video, range(0, meta.n_frames, step), cfg.video.resize)
+    views = find_views(frames)
+    if not views:
+        raise CalibrationError("no frame shows the pitch's creases clearly enough to calibrate automatically")
+    refs = []
+    for k, (frame_id, cal, n) in enumerate(views):
+        fit = [LandmarkObservation(name=name, image=cal.corners[name], pitch=pitch_model.LANDMARKS[name]) for name in CORNER_NAMES]
+        refs.append(
+            ReferenceView(
+                name=f"auto_{k}",
+                source_video=_repo_relative(cfg, video),
+                frame_id=frame_id,
+                image_to_pitch=cal.image_to_pitch.tolist(),
+                fit_points=fit,
+                fit_rms_px=0.0,
+            )
+        )
+        log.info("view auto_%d: frame %d, crease score %.3f, %d frames agree", k, frame_id, cal.score, n)
+    best = views[0]
+    image = frames[best[0]]
+    check = out_dir / "calibration_check.png"
+    check.parent.mkdir(parents=True, exist_ok=True)
+    vis = image.copy()
+    P = np.linalg.inv(best[1].image_to_pitch)
+    for (x0, y0), (x1, y1) in pitch_model.crease_segments():
+        a, b = P @ [x0, y0, 1.0], P @ [x1, y1, 1.0]
+        cv2.line(vis, (int(a[0] / a[2]), int(a[1] / a[2])), (int(b[0] / b[2]), int(b[1] / b[2])), (0, 255, 0), 1, cv2.LINE_AA)
+    cv2.imwrite(str(check), vis)
+    return CalibrationDoc(video_id=video_id_from_path(video), image_size=(meta.width, meta.height), views=refs), check
 
 
 def _repo_relative(cfg: Config, video: Path) -> str:

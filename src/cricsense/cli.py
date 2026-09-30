@@ -39,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     cal = add(
         "calibrate",
-        "click 4 crease corners on a reference frame, then track the pitch mapping through every frame",
+        "find the pitch (--auto, no clicks) or click 4 crease corners, then track the pitch mapping through every frame",
         _calibrate,
         video=True,
     )
@@ -53,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode = cal.add_mutually_exclusive_group()
     mode.add_argument("--no-propagate", action="store_true", help="save the reference view only")
     mode.add_argument("--propagate-only", action="store_true", help="recompute camera.json from the saved views")
+    mode.add_argument("--auto", action="store_true", help="find the reference views from the painted creases, no clicks")
     mode.add_argument(
         "--import-views",
         type=Path,
@@ -109,6 +110,7 @@ def _calibrate(args: argparse.Namespace) -> int:
             propagate=not args.no_propagate,
             propagate_only=args.propagate_only,
             import_views=args.import_views,
+            auto=args.auto,
         )
     except CalibrationError as e:
         print(f"cricsense calibrate: {e}", file=sys.stderr)
