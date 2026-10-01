@@ -46,7 +46,12 @@ def _outputs(cfg: Config, video_id: str) -> dict[str, Path]:
 
 
 def run_all(
-    cfg: Config, video: Path, fresh: set[str] | None = None, voice: bool = False, stop_on_error: bool = True
+    cfg: Config,
+    video: Path,
+    fresh: set[str] | None = None,
+    voice: bool = False,
+    stop_on_error: bool = True,
+    only: set[str] | None = None,
 ) -> list[StepResult]:
     from cricsense.passes.ball import run_ball
     from cricsense.passes.calibrate import run_calibrate
@@ -63,7 +68,7 @@ def run_all(
     outputs = _outputs(cfg, video_id)
 
     def calibrate() -> str:
-        if cfg.calibration_path(video_id).is_file():
+        if cfg.calibration_path(video_id).is_file():  # never replace existing reference views
             run_calibrate(cfg, video, propagate_only=True)
             return "reference views from " + cfg.calibration_path(video_id).name
         run_calibrate(cfg, video, auto=True)
@@ -82,6 +87,8 @@ def run_all(
     }
     results: list[StepResult] = []
     for name in STEPS:
+        if only is not None and name not in only:
+            continue
         if name == "voice" and not voice:
             continue
         if outputs[name].is_file() and name not in fresh:

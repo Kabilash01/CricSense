@@ -125,3 +125,18 @@ when no ball detection anchors a release, and such deliveries get no speed estim
 20-clip benchmark it recovers none of the 4 missed deliveries - their causes are upstream: no
 ball track after the swing (13_3), no bowler found in a wide-camera view (13_6), the bowler too
 small in the wide view for a clean arm signal (13_1).
+
+## Benchmark (scripts/benchmark.py), 6-minute clip, RTX 5060 Laptop + Ryzen 9 8940HX
+
+calibrate 2529 s (0.14x real time: feature matching at full resolution on every frame,
+including the 93% that are replays and close-ups), scoreboard 149 s (2.4x), players 64 s
+(5.6x), ball 305 s (1.2x), fuse 40 s (9x), pose 27 s (13x), commentary 107 s (3.4x), voice
+106 s (3.4x), render 102 s (3.5x); all 57 min (0.11x). Another training job shared the GPU.
+Every step but calibration runs faster than real time.
+
+## Shot type readings are not stable between runs
+
+With the LLM cache cleared (for the benchmark) the VLM's posture readings changed: Axar's six
+went from "slog sweep" to "cover drive", Kohli's 11.2 from "back-foot punch" to "slog sweep".
+The cache had hidden this. Shot type stays labelled "AI read"; to make it trustworthy, read
+each shot several times and keep only answers that agree.

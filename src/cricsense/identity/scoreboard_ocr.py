@@ -166,7 +166,8 @@ class ScoreboardReader:
             return reading
         runs, wickets, (bx, by, bw, bh) = found
         ox0, ox1 = self.layout.anchor["overs_right"]
-        overs = self._tesseract(cv2.cvtColor(image[by : by + bh, bx + bw + ox0 : bx + bw + ox1], cv2.COLOR_BGR2GRAY), "overs")
+        crop = image[by : by + bh, min(bx + bw + ox0, image.shape[1]) : min(bx + bw + ox1, image.shape[1])]
+        overs = self._tesseract(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), "overs") if crop.size else ""  # box at the frame's edge
         base = reading or ScoreboardReading(
             frame_id=frame_id, t=t, batters=[BatterLine(name=None, runs=None, balls=None, on_strike=False)] * 2,
             runs=None, legal_balls=None, bowler=None, bowler_runs=None, bowler_legal_balls=None,
@@ -198,7 +199,10 @@ class ScoreboardReader:
             if len(rows) < hmin:
                 continue
             y, h = y + int(rows.min()), int(rows.max() - rows.min() + 1)
-            roi = cv2.cvtColor(image[y0 + y : y0 + y + h, x : x + w], cv2.COLOR_BGR2HSV)
+            box = image[y0 + y : y0 + y + h, x : x + w]
+            if box.size == 0:
+                continue
+            roi = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
             white = ((roi[..., 2] > 200) & (roi[..., 1] < 80)).astype(np.uint8) * 255  # the digits
             text_img = cv2.copyMakeBorder(
                 255 - cv2.resize(white, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST), 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255

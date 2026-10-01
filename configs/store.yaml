@@ -1,0 +1,11 @@
+# Where `cricsense publish` and the API keep results.
+# database_url: overridden by $CRICSENSE_DB_URL. scripts/pg.sh runs a project-local PostgreSQL
+# on port 54329 (no root needed); SQLite works too: sqlite:///outputs/cricsense.db
+database_url: postgresql+psycopg://cricsense@localhost:54329/cricsense
+
+storage:
+  backend: local          # local | s3 (MinIO, AWS: set bucket, endpoint_url; credentials from the environment)
+  root: outputs/store
+  # backend: s3
+  # bucket: cricsense
+  # endpoint_url: http://localhost:9000

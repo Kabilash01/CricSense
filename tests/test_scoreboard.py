@@ -116,3 +116,14 @@ def test_surname_prefixes_dropped_by_ocr_still_match_the_squad():
     assert clean_name("RKOCK", squad) == "DE KOCK"
     assert clean_name("DUSSEN", squad) == "VAN DER DUSSEN"
     assert clean_name("SHARMA", squad) == "SHARMA"  # exact full name wins before the surname rule
+
+
+def test_score_box_at_the_frame_edge_does_not_crash():
+    import numpy as np
+
+    from cricsense.identity.scoreboard_ocr import ScoreboardLayout, ScoreboardReader
+
+    layout = ScoreboardLayout.from_yaml(REPO_ROOT / "configs" / "scoreboard.yaml")
+    img = np.zeros((1080, 1920, 3), np.uint8)
+    img[930:965, 1800:1920] = (180, 60, 240)  # a pink box touching the right edge, no digits
+    assert ScoreboardReader(layout).read(img, 0, 0.0) is None

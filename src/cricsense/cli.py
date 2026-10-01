@@ -93,6 +93,10 @@ def build_parser() -> argparse.ArgumentParser:
     ru = add("run", "every pass on one video, in order: calibrate (automatic if needed) ... render", _run, video=True)
     ru.add_argument("--fresh", nargs="*", default=[], metavar="STEP", help="re-run these steps even if their output exists (or: all)")
     ru.add_argument("--voice", action="store_true", help="also speak the commentary (local Kokoro by default)")
+    pu = add("publish", "a video's outputs into the database and object storage (configs/store.yaml)", _publish, video_id=True)
+    sv = add("serve", "the HTTP API: upload videos, read deliveries, events, scorecard, commentary, files", _serve)
+    sv.add_argument("--host", default="127.0.0.1")
+    sv.add_argument("--port", type=int, default=8000)
     add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
     return parser
 
@@ -224,6 +228,31 @@ def _run(args: argparse.Namespace) -> int:
     for r in results:
         print(f"{r.name:11s} {r.status:8s} {r.seconds:7.0f} s  {r.note}")
     return 1 if any(r.status == "failed" for r in results) else 0
+
+
+def _publish(args: argparse.Namespace) -> int:
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.publish import run_publish
+
+    setup_logging()
+    print(run_publish(load_config(), args.video_id))
+    return 0
+
+
+def _serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from cricsense.api.app import create_app
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.passes.publish import store_config
+    from cricsense.store import db
+
+    setup_logging()
+    cfg = load_config()
+    uvicorn.run(create_app(cfg, db.connect(store_config(cfg)["database_url"])), host=args.host, port=args.port)
+    return 0
 
 
 def _render(args: argparse.Namespace) -> int:
