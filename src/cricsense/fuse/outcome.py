@@ -17,6 +17,8 @@ from cricsense.schema import ScoreboardReading
 
 MAX_LEGAL_BALLS = 120  # a T20 innings
 MIN_REPEATS = 2
+SECONDS_PER_BALL = 15.0  # no ball is bowled faster than this, replays and breaks included
+MAX_RUNS_PER_BALL = 8  # a six off a no-ball, plus a bit
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,14 @@ def _accept(run: list[ScoreState], states: list[ScoreState], team_of: dict[str, 
         new_innings = side is not None and last_side is not None and side != last_side
         if not new_innings and (s.runs < last.runs or s.wickets < last.wickets or s.legal_balls < last.legal_balls):
             return  # a score never goes backwards: a misread
+        if not new_innings:
+            # nor faster than the game allows: "1.0" misread as "10.0" would otherwise be
+            # accepted and then block every genuine state after it as "going backwards"
+            balls = s.legal_balls - last.legal_balls
+            if balls > 1 + (s.t - last.t) / SECONDS_PER_BALL:
+                return
+            if s.runs - last.runs > MAX_RUNS_PER_BALL * (max(balls, 0) + 1):
+                return
         if _key(s) == _key(last):
             return
     states.append(s)

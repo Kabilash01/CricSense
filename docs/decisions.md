@@ -87,3 +87,15 @@ with no clicks (`scripts/wide_eval.py`, results in outputs/wide_eval.json).
 Wides stay read from the score bar. What it would take: the ball tracked reliably past the
 batter (more labelled frames of this part of the flight; 50 fps footage), the batter's final
 position, and more wides to test on (5 per innings; several matches).
+
+## Score bar over a whole match
+
+- A stable misread that jumps ahead ("1.0" read as "10.0") used to be accepted and then block
+  every genuine state as "going backwards". States must now be reachable in the time elapsed
+  (at most one ball per 15 s, 8 runs per ball). Full final: India 67 -> 118 of 121 ball
+  counts seen, South Africa 24 -> 89; both final scores read exactly (176-7, 169-8).
+- The chase shows other bar variants (score moved left beside "NEED 26 FROM 24 BALLS",
+  comparison panels, full-width FOUR/WICKET banners). Two layout-free readers were tried on
+  120 missed chase frames: OCR of the whole bar strip recovered the score on 2, locating the
+  score box by its colour on 3 (several panels share the colour). Not adopted; a broadcaster's
+  bar variants need their own layout entries.

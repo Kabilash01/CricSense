@@ -88,3 +88,12 @@ def test_a_new_innings_is_not_a_score_going_backwards():
     squad = SQUAD | {"STUBBS", "DE KOCK", "BUMRAH"}
     assert [s.runs for s in trusted_states([*first, *second], squad)] == [176]  # without teams: rejected
     assert [s.runs for s in trusted_states([*first, *second], squad, team_of)] == [176, 4]
+
+
+def test_a_score_jumping_faster_than_the_game_allows_is_a_misread():
+    rs = [
+        *seen(0, 6, 0, 6, (4, 4), (1, 2)),
+        *seen(38, 6, 0, 60, (4, 4), (1, 2)),  # "1.0" read as "10.0" 38 s later
+        *seen(80, 7, 0, 7, (5, 5), (1, 2)),  # the genuine next ball
+    ]
+    assert [(s.runs, s.legal_balls) for s in trusted_states(rs, SQUAD)] == [(6, 6), (7, 7)]
