@@ -99,3 +99,17 @@ position, and more wides to test on (5 per innings; several matches).
   120 missed chase frames: OCR of the whole bar strip recovered the score on 2, locating the
   score box by its colour on 3 (several panels share the colour). Not adopted; a broadcaster's
   bar variants need their own layout entries.
+
+## Pipeline on new clips (benchmark: 20 random clips of the full final)
+
+`scripts/wide_eval.py --cameras-from <a calibrated clip of the match>` runs the vision passes
+on each clip with no clicks. Current: calibrated 14/20 with no wrong pitch (precision first:
+a wrong calibration silently corrupts everything after it; a missing one is visible); delivery
+found on 10 of the 14.
+- The 6 calibration misses: a clip with one pitch frame, a dugout/advert clip with none, and
+  views where only one frame is strong (a second agreeing frame or a known camera is needed).
+- The 4 delivery misses: no ball detection near the release - the candidates there sit at
+  fixed spots (stump tops, crease marks), the ball itself is blurred against the bowler or
+  the main camera cuts in after release. Widening the release zone would let the static
+  objects in. Fixes: the release time from the bowler's arm (pose) and labelled frames of the
+  first part of the flight for the ball model.
