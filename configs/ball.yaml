@@ -17,3 +17,7 @@ length_zones:
   yorker: 2.0     # < 2 m
   full: 6.0       # 2-6 m
   good: 8.0       # 6-8 m; beyond 8 m is short
+
+# The release timed from the bowler's arm (pose) as well as from the ball: finds deliveries
+# whose release the ball detector misses, and times the release for the speed estimate.
+release_from_arm: true

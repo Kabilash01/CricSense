@@ -56,6 +56,7 @@ class Delivery:
     track: list[tuple[Candidate, float, float]] = field(default_factory=list)  # (candidate, gx, gy)
     bounce: Bounce | None = None
     speed_estimate_kph: float | None = None
+    from_hand: bool = False  # the release came from the bowler's arm, not a ball detection
 
 
 def ground_point(image_to_pitch: np.ndarray, u: float, v: float) -> tuple[float, float] | None:
@@ -78,8 +79,23 @@ def release_point(projection: np.ndarray, u: float, v: float, height: float = RE
     return C + s * d if s > 0 else None
 
 
-def find_delivery(candidates: list[Candidate], geometry: dict[int, FrameGeometry], fps: float) -> Delivery | None:
-    """The best-supported delivery among one shot's ball candidates, or None."""
+HAND_ZONE_X = (12.0, 25.0)  # a release from the bowler's hand: looser than a ball detection's zone
+HAND_CONF = 0.5  # how much a hand-started track's first node counts, against a detection's confidence
+
+
+def find_delivery(
+    candidates: list[Candidate],
+    geometry: dict[int, FrameGeometry],
+    fps: float,
+    hand_releases: list[tuple[float, tuple[float, float]]] | None = None,
+) -> Delivery | None:
+    """The best-supported delivery among one shot's ball candidates, or None.
+
+    hand_releases: (release frame, fractional; the hand's image position) from the bowler's
+    arm (cricsense.pose.bowler). Each is tried as a start beside the ball detections in the
+    release zone, so a delivery is found even when the ball is not seen leaving the hand; the
+    best-supported track wins, which is how a swing of the arm in the bound loses to the
+    delivery stride."""
     placed = []
     for c in candidates:
         geo = geometry.get(c.frame_id)
@@ -88,7 +104,18 @@ def find_delivery(candidates: list[Candidate], geometry: dict[int, FrameGeometry
             continue
         placed.append((c, g[0], g[1]))
     placed = _drop_static(placed)
-    if not placed:
+    starts: list[tuple[tuple[Candidate, float, float], np.ndarray, float]] = []  # (node, release point, release t)
+    for frame_f, (hu, hv) in hand_releases or []:
+        frame = int(frame_f)
+        geo = geometry.get(frame)
+        if geo is None or geo.projection is None:
+            continue
+        R = release_point(geo.projection, hu, hv)
+        g = ground_point(geo.image_to_pitch, hu, hv)
+        if R is None or g is None or not (HAND_ZONE_X[0] < R[0] < HAND_ZONE_X[1] and abs(R[1]) < RELEASE_ZONE_Y):
+            continue
+        starts.append(((Candidate(frame, frame_f / fps, hu, hv, HAND_CONF), g[0], g[1]), R, frame_f / fps))
+    if not placed and not starts:
         return None
 
     best: tuple[float, Delivery] | None = None
@@ -105,13 +132,26 @@ def find_delivery(candidates: list[Candidate], geometry: dict[int, FrameGeometry
         bounce = find_bounce([TrackPoint(c.t, gx, gy) for c, gx, gy in track])
         score = len(track) + sum(c.conf for c, _, _ in track) + (3.0 if bounce is not None else 0.0)
         if best is None or score > best[0]:
-            # released between the previous frame and this one
+            # released between the previous frame and this one - or, when the arm says so a
+            # little earlier, then: the first frames of the flight are often not detected
             delivery = Delivery(c0.frame_id, c0.t - 0.5 / fps, R, track, bounce)
             best = (score, delivery)
     if best is None:
+        # no ball detection anchors the release: start from the bowler's hand at each top of a
+        # swing; the best-supported track wins (a swing in the bound has no ball flight after it)
+        for node, R, t_release in starts:
+            track = _follow(placed + [node], node)
+            if len(track) < MIN_TRACK:
+                continue
+            bounce = find_bounce([TrackPoint(c.t, gx, gy) for c, gx, gy in track])
+            score = len(track) + sum(c.conf for c, _, _ in track) + (3.0 if bounce is not None else 0.0)
+            if best is None or score > best[0]:
+                best = (score, Delivery(node[0].frame_id, t_release, R, track, bounce, from_hand=True))
+    if best is None:
         return None
     delivery = best[1]
-    if delivery.bounce is not None and delivery.bounce.t > delivery.release_t:
+    if delivery.bounce is not None and delivery.bounce.t > delivery.release_t and not delivery.from_hand:
+        # (a hand-anchored release is not what the speed model was validated on: no estimate)
         B = np.array([delivery.bounce.x, delivery.bounce.y, 0.0])
         V = release_velocity(delivery.release_point, B, delivery.bounce.t - delivery.release_t)
         delivery.speed_estimate_kph = float(np.linalg.norm(V) * 3.6)

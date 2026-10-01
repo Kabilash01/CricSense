@@ -113,3 +113,15 @@ found on 10 of the 14.
   the main camera cuts in after release. Widening the release zone would let the static
   objects in. Fixes: the release time from the bowler's arm (pose) and labelled frames of the
   first part of the flight for the ball model.
+
+## Release from the bowler's arm: built as a fallback
+
+The bowling hand peaks ~0.3 body heights above the shoulders and drops below them within 1-2
+frames of the release (`pose/bowler.py`): on the dev clip it agrees with the ball-track release
+to within one frame on 7 of 8 deliveries. Used for every release, it moved the speed check
+against radar from 6% to 22% median error (the speed model was validated on ball-anchored
+releases) and a swing in the bound once beat the real release; so it is only a fallback, tried
+when no ball detection anchors a release, and such deliveries get no speed estimate. On the
+20-clip benchmark it recovers none of the 4 missed deliveries - their causes are upstream: no
+ball track after the swing (13_3), no bowler found in a wide-camera view (13_6), the bowler too
+small in the wide view for a clean arm signal (13_1).

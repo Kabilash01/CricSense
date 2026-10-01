@@ -80,6 +80,62 @@ def prefer_precise(found, precise) -> bool:
     return precise is not None and (precise.bounce is not None or found is None or found.bounce is None)
 
 
+ARM_WINDOW_S = 3.0  # the delivery stride happens in the first seconds of a main-view shot
+
+
+def _hand_releases(cfg: Config, video: Path, out_dir: Path, shots: list[list[int]], height: int) -> dict[int, list]:
+    """shot start -> [(release frame, hand image position)] from the bowler's arm, every top of
+    a swing in the first seconds of the shot (cricsense.pose.bowler)."""
+    import os
+
+    import yaml
+
+    from cricsense.io import VideoReader
+    from cricsense.pose.bowler import arm_sample, swing_tops
+    from cricsense.schema import PlayersDoc, Role
+
+    players_path = out_dir / "players.json"
+    pose_cfg = cfg.root / "configs" / "pose.yaml"
+    if not players_path.is_file() or not pose_cfg.is_file():
+        return {}
+    bowler = {p.frame_id: p.box for p in read_doc(players_path, PlayersDoc).frames if p.role == Role.BOWLER}
+    window = {s[0]: [f for f in s[: int(ARM_WINDOW_S * 25)] if f in bowler] for s in shots}
+    wanted = {f for fs in window.values() for f in fs}
+    if not wanted:
+        return {}
+    os.environ.setdefault("YOLO_AUTOINSTALL", "false")
+    from ultralytics import YOLO
+
+    model = YOLO(str(cfg.root / yaml.safe_load(pose_cfg.read_text())["model"]))
+    samples: dict[int, object] = {}
+    with VideoReader(video, start=min(wanted), end=max(wanted) + 1) as reader:
+        for fr in reader:
+            if fr.frame_id not in wanted:
+                continue
+            x1, y1, x2, y2 = bowler[fr.frame_id]
+            bh = y2 - y1
+            side = int(2.2 * bh)  # room above the head for the arm
+            h, w = fr.image.shape[:2]
+            ox = int(np.clip((x1 + x2) / 2 - side / 2, 0, max(w - side, 0)))
+            oy = int(np.clip((y1 + y2) / 2 - side / 2 - 0.2 * bh, 0, max(h - side, 0)))
+            r = model.predict(fr.image[oy : oy + side, ox : ox + side], imgsz=640, conf=0.3, device=cfg.device, verbose=False)[0]
+            if r.keypoints is None or len(r.boxes) == 0:
+                continue
+            boxes = r.boxes.xyxy.cpu().numpy() + [ox, oy, ox, oy]
+            i = int(np.argmin([abs((b[0] + b[2]) / 2 - (x1 + x2) / 2) + abs(b[1] - y1) for b in boxes]))
+            kp = r.keypoints.data[i].cpu().numpy().copy()
+            kp[:, 0] += ox
+            kp[:, 1] += oy
+            s = arm_sample(fr.frame_id, kp, bh)
+            if s is not None:
+                samples[fr.frame_id] = s
+    out = {}
+    for start, fs in window.items():
+        tops = swing_tops([samples[f] for f in fs if f in samples])
+        out[start] = [(t.frame + 0.5, t.hand_uv) for t in tops]
+    return out
+
+
 def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool = False) -> tuple[BallDoc, Path]:
     bcfg = cfg.ball
     det = bcfg["detector"]
@@ -121,11 +177,12 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
             if d["cls"] == 0 and d["conf"] >= det["min_track_conf"] and (d["box"][1] + d["box"][3]) / 2 < 0.85 * height
         ]
 
+    hands = _hand_releases(cfg, video, out_dir, shots, height) if bcfg.get("release_from_arm", True) else {}
     for shot in shots:
-        found = find_delivery(candidates(cands, shot), geo, fps)
+        found = find_delivery(candidates(cands, shot), geo, fps, hands.get(shot[0]))
         model, estimate = weights.name, found.speed_estimate_kph if found is not None else None
         if track_cands is not None:
-            precise = find_delivery(candidates(track_cands, shot), geo, fps)
+            precise = find_delivery(candidates(track_cands, shot), geo, fps, hands.get(shot[0]))
             if prefer_precise(found, precise):
                 found, model, estimate = precise, track_weights.name, precise.speed_estimate_kph
             else:
