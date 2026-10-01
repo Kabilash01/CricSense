@@ -155,3 +155,13 @@ training job on the GPU:
   shot takes over a minute (memory falls back to one frame at a time, then the CPU), and the
   two processed had no bounce (offline: one inferred, one none). Needs a free GPU or faster
   inference (FP16/TensorRT, a crop around the pitch); not claimed as working live.
+
+## Score box found by colour: South Africa's chase, before and after
+
+The score bar slides ~20 px sideways or up at times, and the chase shows a compact bar; the
+layout's fixed rectangles then cut the digits. Finding the pink score box and reading its
+digits (and the overs to its right) recovered 96 of 120 missed chase frames in a test, and over
+South Africa's whole innings: ball counts seen 90 -> 115 of 121, consecutive single-ball steps
+76 -> 106, final score 169-8 read exactly. 3474 of 8210 readings came from the score box. The
+scan of the innings took ~50 min once frames with no bar on screen skip the search (a first
+version, run beside other jobs, was stopped after 7 h).
