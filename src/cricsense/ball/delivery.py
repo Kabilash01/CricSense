@@ -31,6 +31,10 @@ STATIC_RADIUS_M = 0.3
 STATIC_MIN_FRAMES = 10
 MAX_FLIGHT_FRAMES = 36  # ~1.4 s at 25 fps: slower than any delivery
 MIN_TRACK = 5
+# The fastest delivery ever recorded (161.3 km/h). A faster estimate is a release seen late -
+# the first frames of a fast ball's flight are often not detected - so it is withheld: on 10
+# radar balls, the 4 above it were 15-43% fast, the 6 below it 0-9% off.
+MAX_PLAUSIBLE_KPH = 161.3
 
 
 @dataclass(frozen=True)
@@ -154,7 +158,8 @@ def find_delivery(
         # (a hand-anchored release is not what the speed model was validated on: no estimate)
         B = np.array([delivery.bounce.x, delivery.bounce.y, 0.0])
         V = release_velocity(delivery.release_point, B, delivery.bounce.t - delivery.release_t)
-        delivery.speed_estimate_kph = float(np.linalg.norm(V) * 3.6)
+        kph = float(np.linalg.norm(V) * 3.6)
+        delivery.speed_estimate_kph = kph if kph <= MAX_PLAUSIBLE_KPH else None
     return delivery
 
 

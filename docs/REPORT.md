@@ -15,8 +15,9 @@ claims were checked first: several did not hold (a 409.9 km/h "speed" no code pr
 player model whose weights were lost and which, retrained, found nobody in this broadcast).
 
 **Data.** The ICC Men's T20 World Cup 2024 final (India v South Africa), a 5 h 21 min, 25 fps,
-1080p broadcast. Evaluation clips: overs 11.1-12.4 of India's innings (6 min) and 7.1-7.5 of
-South Africa's (3 min, never used in development); a benchmark of 20 clips cut at random from
+1080p broadcast. Evaluation clips: overs 11.1-12.4 of India's innings (6 min; spin and pace),
+7.1-7.5 of South Africa's (3 min, spin) and Bumrah's over 2 of it (5 min, pace, a wicket) - the
+last two never used in development; a benchmark of 20 clips cut at random from
 the whole match around the balls the score bar identified.
 
 ## 2. System
@@ -47,8 +48,11 @@ painted creases are fixed by the laws, so calibration needs no clicks: white-lin
 by how much of the regulation creases lands on paint plus whether the stumps stand where the
 middle-stump base projects; homographies no real camera could produce are rejected. Frames are
 grouped by where their calibration places the camera, and a view needs two strong agreeing
-frames (or three). The tracker then follows each frame (ORB, RANSAC, outlier-robust
-smoothing), skipping frames with no pitch in view.
+frames (or three). Each camera keeps up to six strongly calibrated frames from different moments
+as references: the camera zooms hard during a delivery, and with one reference the tracker
+matched only 206 of Bumrah's over's frames and missed his wicket ball (884 frames and all six
+balls with six). The tracker then follows each frame (ORB, RANSAC, outlier-robust smoothing),
+skipping frames with no pitch in view.
 
 | | Result |
 |---|---|
@@ -79,11 +83,21 @@ the bounce is where the ball's ground point turns.
 | Deliveries found | 10/10 (either model alone: 10 or 9) |
 | Bounces | 9 (8 or 6 alone); hand-checked: 4.77 m vs 4.8 m |
 | Speed | the broadcaster's radar, read from the bar, when shown (6 of 10 balls) |
-| Our estimate ("≈", time of flight release -> bounce) | 6% median error against radar (3 balls; worst 14%) |
+| Our estimate ("≈", time of flight release -> bounce) | 6% median error against radar (6 balls, three clips; worst 9%) |
+| Bumrah's over (pace, unseen) | 6/6 deliveries, 6 bounces, radar on all 6 |
 
 The original design's speed - pixel displacement through the ground homography, with a Kalman
 filter - was measured at 1-72 km/h against radar 81-146: an airborne ball is not on the ground
 plane, and from behind the bowler its sight line barely moves.
+
+The time-of-flight estimate is weakest on pace. A fast ball reaches the bounce about 0.3 s
+after release - some 8 frames at 25 fps - so one frame of error moves the estimate by about
+13% (a spinner's 0.6 s halves that), and the first frames of a fast ball's flight are often not
+detected, so the release is seen late and the estimate comes out fast. Of 10 balls with radar,
+4 estimates (all pace) came out at 167-198 km/h, faster than any delivery ever recorded
+(161.3 km/h): 15-43% too fast. Such estimates are now withheld; the other 6 are 0-9% off
+(median 6%). Radar is shown whenever the broadcast gives it - on every ball of Bumrah's over;
+a higher-frame-rate source would help the estimate most.
 
 ### 3.4 The batter
 
@@ -97,13 +111,16 @@ and "left" on the one not hit; the batting hand from where the feet stand at the
 Outcomes come from the score bar's changes, which must be stable (seen twice), plausible (never
 backwards, never faster than a ball per 15 s) and recognised (squad names, surname matching
 for prefixes like "de KOCK"). Where the layout's rectangles miss (the bar slides; the chase's
-compact bar), the score box is found by colour. A ball-and-over state machine then keeps the
+compact bar), the score box is found by colour. Its digits are read glyph by glyph against
+templates of the broadcaster's font, harvested from the broadcast where Tesseract's reading was
+unambiguous (3,453 scores; leave-one-out 250/250): Tesseract read "11-1" as "1-1", "11" or "-1"
+under every setting tried, which froze Bumrah's over at 7-1 after the wicket. A ball-and-over state machine then keeps the
 score, strike, extras and figures by the laws and is checked against the bar after every ball.
 
 | | Result |
 |---|---|
-| Outcomes on the two test clips | 15/15 (incl. a six and a four) |
-| Score engine checks | 88/88 and 40/40 |
+| Outcomes on the three test clips | 21/21 (incl. a six, two fours, a wicket, an extra) |
+| Score engine checks | 88/88, 40/40 and 54/54 |
 | Whole match | both innings' final scores exact (176-7, 169-8); ball counts seen: India 118/121, South Africa 115/121 (90 before the score-box reader; single-ball steps 76 -> 106) |
 
 The score and overs checks are consistency checks (the outcomes come from the same bar); strike

@@ -1,0 +1,148 @@
+schema_version: '1.0'
+video_id: st_bumrah_o2
+image_size: [1920, 1080]
+views:
+- name: auto_0
+  source_video: data/st_bumrah_o2.mp4
+  frame_id: 300
+  image_to_pitch:
+  - [9.465305255128497e-05, 0.06526481392595444, -24.20719083909267]
+  - [0.009309126285971612, 9.514673408072978e-05, -9.322992562673695]
+  - [6.0101506753627516e-06, 0.000745126892516199, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [813.3444872958257, 394.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1181.8469657242742, 393.5]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [761.415940302208, 842.516538160315]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1224.7519297486185, 842.6879706347322]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_1
+  source_video: data/st_bumrah_o2.mp4
+  frame_id: 1100
+  image_to_pitch:
+  - [4.081669358083887e-05, 0.09207099837473033, -33.64087086633164]
+  - [0.013062052641762988, 9.49699902426854e-05, -12.859727036572016]
+  - [3.3456305429211544e-05, 0.001055311794229367, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [836.8809822107958, 384.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1127.5386807278742, 384.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [797.0310541474654, 735.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1162.8367661518027, 738.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_2
+  source_video: data/st_bumrah_o2.mp4
+  frame_id: 2300
+  image_to_pitch:
+  - [0.00030689729508648296, 0.12269739952433018, -37.99340171294169]
+  - [0.017563770101913297, 0.00010505447231579103, -17.06530787721925]
+  - [2.5621480582786464e-05, 0.0013548441405098223, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [860.0960340734534, 322.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1079.6666666666667, 321.5]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [831.529016642016, 587.5]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1105.2576623376622, 588.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_3
+  source_video: data/st_bumrah_o2.mp4
+  frame_id: 7750
+  image_to_pitch:
+  - [0.00013888505828190306, 0.0812313725829996, -28.59957662814555]
+  - [0.011564423728495896, 9.133178005927592e-05, -11.321668612701005]
+  - [7.692735653248793e-06, 0.0009360095842472121, 0.9999999999999999]
+  fit_points:
+  - name: striker_popping_left
+    image: [821.5765511535986, 371.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1130.8023615950444, 370.5]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [778.4017860213127, 747.6243210188494]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1168.1522997002885, 747.664241066918]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_4
+  source_video: data/st_bumrah_o2.mp4
+  frame_id: 5500
+  image_to_pitch:
+  - [0.0009496383884054941, 0.1317692036183306, -47.87771543043425]
+  - [0.018887596133727896, 0.00012093988075337459, -18.46814721632773]
+  - [6.977409664086607e-05, 0.00146883093020668, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [863.127688172043, 372.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1088.648387096774, 370.5]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [833.5, 645.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1115.2950408035153, 646.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_5
+  source_video: data/st_bumrah_o2.mp4
+  frame_id: 1350
+  image_to_pitch:
+  - [0.00017304926079308766, 0.38294779963153897, -173.8250760139954]
+  - [0.05546708383358475, -0.005920461434600896, -72.04085382657408]
+  - [0.00014184365306141002, 0.004668426590683905, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [1268.7, 464.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1428.5, 464.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [1267.827681808488, 664.7263878457444]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1472.7549384920555, 666.4701623749136]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null

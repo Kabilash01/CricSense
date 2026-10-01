@@ -19,9 +19,9 @@ what did not work is recorded with its measurements in [docs/decisions.md](docs/
 | **Pitch calibration** | Automatic: the regulation creases found in the picture, scored against the laws' dimensions; then the camera tracked frame to frame | 7 of 8 crease corners within 3.3 px of hand clicks; 14 of 20 new clips calibrated, none wrongly |
 | **Players** | Detection, tracking, roles from pitch geometry and movement; names from the score bar; teams from the match sheet | 51 identities for 51 appearances on 12 shots |
 | **Ball** | Two detectors (one fine-tuned on 94 hand-reviewed frames of this broadcast); delivery, bounce, length, line | 10/10 deliveries, 9 bounces; bounce 4.77 m vs 4.8 m by hand |
-| **Speed** | The broadcaster's radar from the score bar; our own time-of-flight estimate shown as "≈" | Estimate vs radar: 6% median error (3 balls) |
-| **Outcomes** | Runs, boundaries, wickets, wides, no-balls from the score bar's changes | 15/15 balls on the two test clips; both innings' final scores read exactly over the whole match |
-| **Score engine** | A ball-and-over state machine (strike rotation, extras, figures), checked against the bar | 88/88 and 40/40 checks agree |
+| **Speed** | The broadcaster's radar from the score bar; our own time-of-flight estimate shown as "≈" | Radar on 17 of 21 test balls; estimate vs radar 6% median (6 balls), withheld when faster than any recorded ball |
+| **Outcomes** | Runs, boundaries, wickets, wides, no-balls from the score bar's changes | 21/21 balls on the three test clips (spin and pace); both innings' final scores read exactly over the whole match |
+| **Score engine** | A ball-and-over state machine (strike rotation, extras, figures), checked against the bar | 88/88, 40/40 and 54/54 checks agree |
 | **Batter** | Pose: footwork on the calibrated pitch, swing (played / left), batting hand | Swing right on 9/9 balls; hand 10/10 |
 | **Shot type** | A vision model describes the posture three times; textbook rules name the shot when two agree | Labelled "AI read"; 5 of 8 shots agreed |
 | **Commentary** | An LLM given only each ball's facts, every line fact-checked (numbers, names, events); templates as fallback | |
@@ -95,5 +95,5 @@ src/cricsense/   calibration/ (auto, camera) identity/ (score bar, names) ball/ 
 configs/         every threshold and path; no absolute paths in source
 scripts/         benchmark, evaluation, labelling and fine-tuning, clip cutting, local PostgreSQL
 docs/            ARCHITECTURE.md, decisions.md (what was measured and decided), adr/, history/
-tests/           172 tests: synthetic cameras and scenes, real fixtures, API on SQLite
+tests/           175 tests: synthetic cameras and scenes, real fixtures, API on SQLite
 ```

@@ -11,6 +11,12 @@ clips:
   final_0051_6min:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 3055.0
+  st_022000:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 8400.0
+  st_bumrah_o2:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 6840.0
   we_legal_0_4:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 106.92
@@ -71,4 +77,3 @@ clips:
   we_wide_19_1:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 5503.08
-  st_022000: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 8400.0}

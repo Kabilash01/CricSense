@@ -20,6 +20,7 @@ import numpy as np
 import pytesseract
 import yaml
 
+from cricsense.identity import digits
 from cricsense.schema import BatterLine, ScoreboardReading
 
 Rect = tuple[int, int, int, int]
@@ -42,6 +43,7 @@ class ScoreboardLayout:
     icon_min_fraction: float
     sample_every: int
     anchor: dict | None = None  # the score box, found by colour where the layout misses it (see read)
+    digits: Path | None = None  # templates of the score box's font (cricsense.identity.digits)
 
     @classmethod
     def from_yaml(cls, path: Path) -> ScoreboardLayout:
@@ -58,6 +60,7 @@ class ScoreboardLayout:
             icon_hue=tuple(icon["hue"]),
             icon_min_fraction=float(icon["min_fraction"]),
             anchor=raw.get("anchor"),
+            digits=path.parent / raw["digits"] if raw.get("digits") else None,
             sample_every=int(raw.get("sample_every", 12)),
         )
 
@@ -136,6 +139,8 @@ class ScoreboardReader:
         self.squad_names = squad_names  # names as the bar prints them, to snap OCR slips to
         self._cache: dict[str, tuple[np.ndarray, str]] = {}
         self.ocr_calls = 0
+        has_digits = layout.anchor and layout.digits is not None and layout.digits.is_file()
+        self.digit_reader = digits.DigitReader.load(layout.digits) if has_digits else None
 
     def is_visible(self, image: np.ndarray) -> bool:
         return self._hue_fraction(image, self.layout.presence_rect, self.layout.presence_hue, min_sat=120) >= (
@@ -157,8 +162,15 @@ class ScoreboardReader:
         digits read, with the overs to its right: a score-only reading (other fields are kept
         only if the layout read them). Panels shift independently, so the other fields are not
         re-read from the box's offset; a misread score is caught downstream by the rule that a
-        score cannot go backwards or faster than the game."""
+        score cannot go backwards or faster than the game. With the font's digit templates the
+        box's score replaces the layout's (Tesseract drops 1s: "11-1" read as "1-1")."""
         reading = self._read_fields(image, frame_id, t) if self.is_visible(image) else None
+        if reading is not None and self.digit_reader is not None:
+            found = self._find_score_box(image)
+            if found is not None:
+                runs, wickets, _ = found
+                raw = {**reading.raw, "score_box": f"{runs}-{wickets}"}
+                reading = reading.model_copy(update={"runs": runs, "wickets": _within(wickets, 0, 10), "raw": raw})
         if not self.layout.anchor or (reading is not None and reading.runs is not None and reading.legal_balls is not None):
             return reading
         if reading is None and not self._bar_present(image):
@@ -191,6 +203,16 @@ class ScoreboardReader:
 
     def _find_score_box(self, image: np.ndarray) -> tuple[int, int, tuple[int, int, int, int]] | None:
         """(runs, wickets, box x, y, w, h in pixels) of a coloured box whose white digits read as a score."""
+        for rect, box in self.score_boxes(image):
+            text = self.read_box(box)
+            # the box's rounded corners can read as a leading "-": search, do not match whole
+            m = re.search(r"(\d{1,3})[-/](\d{1,2})", text.replace(" ", ""))
+            if m:
+                return int(m.group(1)), int(m.group(2)), rect
+        return None
+
+    def score_boxes(self, image: np.ndarray):
+        """Candidate score boxes, largest first: ((x, y, w, h) in pixels, the box's pixels)."""
         a = self.layout.anchor
         h_img = image.shape[0]
         y0, y1 = (round(v * h_img / self.layout.reference_size[1]) for v in a["band"])
@@ -210,20 +232,24 @@ class ScoreboardReader:
                 continue
             y, h = y + int(rows.min()), int(rows.max() - rows.min() + 1)
             box = image[y0 + y : y0 + y + h, x : x + w]
-            if box.size == 0:
-                continue
-            roi = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
-            white = ((roi[..., 2] > 200) & (roi[..., 1] < 80)).astype(np.uint8) * 255  # the digits
-            text_img = cv2.copyMakeBorder(
-                255 - cv2.resize(white, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST), 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255
-            )
-            self.ocr_calls += 1
-            text = pytesseract.image_to_string(text_img, config="--psm 7 -c tessedit_char_whitelist=0123456789-/")
-            # the box's rounded corners can read as a leading "-": search, do not match whole
-            m = re.search(r"(\d{1,3})[-/](\d{1,2})", text.replace(" ", ""))
-            if m:
-                return int(m.group(1)), int(m.group(2)), (x, y0 + y, w, h)
-        return None
+            if box.size:
+                yield (x, y0 + y, w, h), box
+
+    def read_box(self, box: np.ndarray) -> str:
+        """A score box's text: glyph templates where the layout has them, else Tesseract."""
+        white = digits.white_mask(box)
+        if self.digit_reader is not None:
+            text = self.digit_reader.read(white)
+            if text is not None:
+                return text
+        return self.tesseract_box(white)
+
+    def tesseract_box(self, white: np.ndarray) -> str:
+        text_img = cv2.copyMakeBorder(
+            255 - cv2.resize(white * 255, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST), 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255
+        )
+        self.ocr_calls += 1
+        return pytesseract.image_to_string(text_img, config="--psm 7 -c tessedit_char_whitelist=0123456789-/")
 
     def _read_fields(self, image: np.ndarray, frame_id: int, t: float) -> ScoreboardReading:
         raw = {name: self._ocr(image, rect, name) for name, rect in self.layout.fields.items()}

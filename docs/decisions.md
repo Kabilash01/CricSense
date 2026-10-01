@@ -11,6 +11,11 @@ for any training or tuning of thresholds unless stated.
   sight line barely moves.
 - Time of flight, release to bounce, with the fine-tuned ball model's track: median error 6%
   (3 radar balls, worst 14%). Shown as "≈ ... estimate", only with a confirmed bounce.
+  The worst case is pace: about 8 frames from release to bounce at 25 fps, so one frame is
+  ~13% of the speed (spinners: ~15 frames, ~7%), and a fast ball's first frames of flight are
+  often missed, so its release is seen late. Bumrah's over added 5 radar balls: 3 estimates came
+  out at 171-198 km/h. With all 10: the 4 above 161.3 km/h (the fastest ball ever recorded) were
+  15-43% fast; the 6 below, 0-9% off (median 6%). Estimates above 161.3 km/h are withheld.
 
 ## Two ball models
 
@@ -165,3 +170,27 @@ South Africa's whole innings: ball counts seen 90 -> 115 of 121, consecutive sin
 76 -> 106, final score 169-8 read exactly. 3474 of 8210 readings came from the score box. The
 scan of the innings took ~50 min once frames with no bar on screen skip the search (a first
 version, run beside other jobs, was stopped after 7 h).
+
+## Pace: Bumrah's over 2 of South Africa's chase (unseen clip, 5 min)
+
+Added so the demo and the measurements cover pace, not only spin in the chase. It exposed three
+faults, each fixed and re-measured on all three test clips (no change on the other two: 88/88
+and 40/40 score checks as before):
+
+- **Calibration references.** One reference frame per camera: the camera zooms hard during a
+  delivery, so feature matching found only 206 of the clip's frames and missed the wicket ball.
+  Each camera now keeps up to six strongly calibrated (>= 0.78) frames at least 10 s apart:
+  884 frames, 6/6 deliveries. Cost: every frame is matched against every reference (~2.3x the
+  matching time). Matching only the last-used reference was tried and dropped: a pitch
+  calibration is relative to the bowling direction, so the two ends' cameras get the same centre
+  and cannot be told apart by position; the tracker test of a cut between ends failed.
+- **Score digits.** Tesseract read the score box's "11-1" as "1-1", "11", "111" or "-1" under
+  every page mode and scaling tried, freezing the over at 7-1. The box's digits are now read glyph
+  by glyph against templates of the font (`configs/scoreboard_digits.npz`, harvested by
+  `scripts/harvest_digits.py` from 3,453 unambiguous readings; leave-one-out 250/250). Over 2:
+  54/54 checks, the wicket and the four right.
+- **A second "delivery" 2 s after a real one** (the ball in play, seen in a wide view): two
+  deliveries cannot be under 10 s apart; the later is dropped. Radar now goes to the last
+  delivery before the reading appears, not the last tracked shot (it had moved 142.4 km/h to
+  the false one). An aborted run-up (no ball recorded by the bar) still shows as a delivery with
+  no outcome ("no evidence").

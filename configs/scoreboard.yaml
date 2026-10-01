@@ -3,6 +3,8 @@
 # actual frame size. A different broadcaster needs a different file, not different code.
 layout: icc_t20wc_2024
 reference_size: [1920, 1080]
+# the score box's font, glyph by glyph (scripts/harvest_digits.py; cricsense.identity.digits)
+digits: scoreboard_digits.npz
 
 # The pink score box; if it is not on screen the bar is hidden (replay, graphic, cut).
 presence:

@@ -70,3 +70,10 @@ def test_views_need_two_agreeing_frames():
     one = find_views({0: frame(seed=1)})
     two = find_views({0: frame(seed=1), 50: frame(seed=2)})
     assert one == [] and len(two) == 1 and two[0][2] == 2
+
+
+def test_a_camera_keeps_references_from_different_moments():
+    views = find_views({0: frame(seed=1), 50: frame(seed=2), 400: frame(seed=3)})
+    # one camera: its best frame, plus the frame far enough from it in time (not the one 50 frames on)
+    assert len(views) == 2 and {f for f, _, _ in views} in ({0, 400}, {50, 400})
+    assert all(n == 3 for _, _, n in views)

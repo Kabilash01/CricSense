@@ -127,3 +127,18 @@ def test_score_box_at_the_frame_edge_does_not_crash():
     img = np.zeros((1080, 1920, 3), np.uint8)
     img[930:965, 1800:1920] = (180, 60, 240)  # a pink box touching the right edge, no digits
     assert ScoreboardReader(layout).read(img, 0, 0.0) is None
+
+
+@needs_tesseract
+def test_score_box_font_keeps_the_ones():
+    """Tesseract read this "11-1" as "1-1", "11" or "-1"; the font's glyph templates do not drop the 1s."""
+    r = ScoreboardReader(LAYOUT).read(frame_with("scorebar_eleven_one.png"), frame_id=0, t=0.0)
+    assert (r.runs, r.wickets, r.legal_balls) == (11, 1, 10)
+
+
+def test_glyphs_split_digits_and_dash():
+    from cricsense.identity.digits import glyphs, white_mask
+
+    box = cv2.imread(str(FIXTURES / "scorebar_eleven_one.png"))[15:65, 895:1035]
+    kinds = ["-" if isinstance(g, str) else "d" for g in glyphs(white_mask(box))]
+    assert kinds == ["d", "d", "-", "d"]

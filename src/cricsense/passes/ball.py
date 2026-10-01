@@ -80,6 +80,9 @@ def prefer_precise(found, precise) -> bool:
     return precise is not None and (precise.bounce is not None or found is None or found.bounce is None)
 
 
+# A bowler cannot deliver twice this close together; a second "delivery" is the ball in play
+# after the shot (seen when tracking held through a wide view of the field: Bumrah's over).
+MIN_BALL_GAP_S = 10.0
 ARM_WINDOW_S = 3.0  # the delivery stride happens in the first seconds of a main-view shot
 
 
@@ -165,7 +168,6 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
         else None
     )
     shots = shots_of(sorted(geo))
-    radar = radar_per_shot(readings, shots, fps)
 
     frames_out: list[BallFrame] = []
     deliveries: list[Delivery] = []
@@ -188,6 +190,9 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
             else:
                 estimate = None
         if found is None:
+            continue
+        if deliveries and found.release_t - deliveries[-1].release_t < MIN_BALL_GAP_S:
+            log.info("shot %d-%d: ball %.1f s after the last delivery, in play: not a delivery", shot[0], shot[-1], found.release_t - deliveries[-1].release_t)
             continue
         did = len(deliveries)
         b = found.bounce
@@ -217,11 +222,13 @@ def run_ball(cfg: Config, video: Path, weights: Path | None = None, fresh: bool 
                 length_m=None if b is None else b.x,
                 line_m=None if b is None else b.y,
                 length_class=None if b is None else zones.classify(b.x),
-                radar_speed_kph=radar.get(shot[0]),
+                radar_speed_kph=None,  # below: radar belongs to deliveries, not to every shot
                 speed_estimate_kph=estimate,
                 track_model=model,
             )
         )
+    radar = radar_per_shot(readings, [[d.shot_frames[0]] for d in deliveries], fps)
+    deliveries = [d.model_copy(update={"radar_speed_kph": radar.get(d.shot_frames[0])}) for d in deliveries]
     frames_out.sort(key=lambda f: f.frame_id)
     run = RunInfo(wall_time_s=time.perf_counter() - t0, frames_processed=len(geo), device=cfg.device)
     doc = BallDoc(video=cam.video, run=run, frames=frames_out, deliveries=deliveries)

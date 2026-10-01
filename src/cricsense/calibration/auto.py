@@ -290,6 +290,11 @@ ACCEPT = 0.72  # a frame this well explained by the regulation creases can join 
 STRONG = 0.78  # a view needs two agreeing frames this good, or ...
 SUPPORTED = 3  # ... this many agreeing frames (a batter on a crease can fool one or two frames)
 SAME_CAMERA_M = 6.0  # calibrations placing the camera this close: the same fixed camera
+# A camera zooms hard during each delivery, and frames are tracked by matching features against
+# a reference: one reference per camera left whole delivery shots unmatched (Bumrah's over:
+# 4 of 6 balls). Each camera keeps up to this many references, from different moments.
+MAX_REFS_PER_CAMERA = 6
+REF_GAP_FRAMES = 250  # references of one camera at least this far apart (10 s at 25 fps)
 
 
 def find_views(
@@ -299,7 +304,8 @@ def find_views(
 
     Frames are calibrated independently; confident ones are grouped by camera (the broadcast
     films each end from a fixed camera, so a view's crease corners barely move between its
-    frames), and each group's best frame becomes the reference. A group of one is dropped:
+    frames), and each group's best frame becomes the reference, followed by up to
+    MAX_REFS_PER_CAMERA - 1 further frames of it from other moments. A group of one is dropped:
     a single frame is not enough to trust a view."""
     found = [(f, r) for f, img in sorted(frames.items()) if (r := calibrate(img, bottom)) is not None and r.score >= ACCEPT]
     # A broadcast camera turns and zooms but stays put, so calibrations of one camera place it at
@@ -321,10 +327,21 @@ def find_views(
     def known(c: np.ndarray) -> bool:  # where a camera of this match is already known to stand
         return any(np.linalg.norm(c - k) < SAME_CAMERA_M for k in (known_cameras or []))
 
-    return [
-        (g[0][0], g[0][1], len(g))
+    accepted = [
+        g
         for g, c in zip(groups, centres)
         if (len(g) >= 2 and all(r.score >= STRONG for _, r in g[:2]))
         or len(g) >= SUPPORTED
         or (known(c) and g[0][1].score >= STRONG)  # a short clip: one strong frame at a known camera
     ]
+    # each camera's best frame first, then its further references (best first, spread in time)
+    views = [(g[0][0], g[0][1], len(g)) for g in accepted]
+    for g in accepted:
+        chosen = [g[0][0]]
+        for f, r in g[1:]:
+            if len(chosen) >= MAX_REFS_PER_CAMERA:
+                break
+            if r.score >= STRONG and all(abs(f - c) >= REF_GAP_FRAMES for c in chosen):
+                chosen.append(f)
+                views.append((f, r, len(g)))
+    return views
