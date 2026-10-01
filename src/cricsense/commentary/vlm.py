@@ -81,21 +81,41 @@ def contact_frames(video, centre: int, striker_box=None) -> list[bytes]:
     return [out[k] for k in sorted(out)]
 
 
-def read_shot(cfg: LLMConfig, key: str, frames: list[bytes], cache: Cache) -> dict | None:
-    """{"shot", "direction", "observed"} if the frames show it clearly, else None."""
+VOTES = 3  # readings per shot
+AGREE = 2  # readings that must name the same shot
+
+
+def read_shot(cfg: LLMConfig, key: str, frames: list[bytes], cache: Cache, votes: int = VOTES) -> dict | None:
+    """{"shot", "direction", "observed", "votes"} if enough independent readings agree, else None.
+
+    One reading is not stable: with the cache cleared, the same frames gave a different shot
+    (Axar's six: "slog sweep", then "cover drive"). So the posture is read `votes` times and a
+    shot is reported only when AGREE of them name it (and the side) the same way."""
     if not frames:
         return None
-    k = cache.key("vlm-posture", cfg.provider, cfg.model, PROMPT, [np.frombuffer(f, np.uint8).sum() % 1_000_003 for f in frames])
-    reply = cache.get(k)
-    if reply is None:
-        reply = complete(cfg, key, "You describe cricket video frames. Answer only with the JSON asked for.", PROMPT, frames)
-        cache.put(k, reply)
-    try:
-        o = parse_json(reply)
-        clear = float(o.get("clear", 0))
-    except (ValueError, TypeError, json.JSONDecodeError):
+    digest = [np.frombuffer(f, np.uint8).sum() % 1_000_003 for f in frames]
+    readings = []
+    for attempt in range(votes):
+        k = cache.key("vlm-posture", cfg.provider, cfg.model, PROMPT, digest, attempt)
+        reply = cache.get(k)
+        if reply is None:
+            reply = complete(cfg, key, "You describe cricket video frames. Answer only with the JSON asked for.", PROMPT, frames)
+            cache.put(k, reply)
+        try:
+            o = parse_json(reply)
+            clear = float(o.get("clear", 0))
+        except (ValueError, TypeError, json.JSONDecodeError):
+            continue
+        shot = name_shot(o)
+        if shot is not None and clear >= MIN_CLEAR:
+            readings.append((shot, o["ball_side"], o))
+    if not readings:
         return None
-    shot = name_shot(o)
-    if shot is None or clear < MIN_CLEAR:
+    counts: dict[tuple[str, str], int] = {}
+    for shot, side, _ in readings:
+        counts[(shot, side)] = counts.get((shot, side), 0) + 1
+    (shot, side), n = max(counts.items(), key=lambda kv: kv[1])
+    if n < AGREE:
         return None
-    return {"shot": shot, "direction": f"{o['ball_side']} side" if o["ball_side"] != "straight" else "straight", "observed": o}
+    observed = next(o for s_, sd, o in readings if (s_, sd) == (shot, side))
+    return {"shot": shot, "direction": f"{side} side" if side != "straight" else "straight", "observed": observed, "votes": f"{n}/{votes}"}

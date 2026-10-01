@@ -87,3 +87,16 @@ def test_shot_is_named_from_the_posture_by_the_textbook():
     assert name_shot({**upright, "foot": "back", "ball_side": "leg"}) == "pull"
     assert name_shot({**upright, "ball_side": "unclear"}) is None
     assert name_shot({**upright, "stance": "unclear", "knee_on_ground": False}) is None
+
+
+def test_a_shot_is_reported_only_when_readings_agree(tmp_path, monkeypatch):
+    from cricsense.commentary import vlm
+
+    seen = {"knee_on_ground": True, "stance": "kneeling", "foot": "front", "bat_finish": "high", "ball_side": "leg", "clear": 0.9}
+    drive = {"knee_on_ground": False, "stance": "upright", "foot": "front", "bat_finish": "high", "ball_side": "off", "clear": 0.9}
+    replies = iter([seen, drive, seen])
+    monkeypatch.setattr(vlm, "complete", lambda *a, **k: __import__("json").dumps(next(replies)))
+    got = vlm.read_shot(LLMConfig("openai", "m"), "k", [b"jpeg"], Cache(tmp_path / "c.json"))
+    assert got["shot"] == "slog sweep" and got["votes"] == "2/3"
+    replies = iter([seen, drive, {**drive, "ball_side": "straight"}])
+    assert vlm.read_shot(LLMConfig("openai", "m"), "k", [b"other"], Cache(tmp_path / "d.json")) is None  # no two agree
