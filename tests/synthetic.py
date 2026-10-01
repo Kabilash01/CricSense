@@ -43,6 +43,12 @@ def render_world(seed: int = 0, creases: bool = True) -> np.ndarray:
     world = cv2.merge([base // 3, 60 + base // 2, base // 3])
     if creases:
         to_world = pitch_to_world()
+        # the pitch itself: a worn, pale-brown strip (what a real broadcast shows under the creases)
+        corners = [to_world @ np.array([x, y, 1.0]) for x, y in ((-3, -1.6), (-3, 1.6), (23, 1.6), (23, -1.6))]
+        strip = np.zeros(world.shape[:2], np.uint8)
+        cv2.fillPoly(strip, [np.array([(round(p[0]), round(p[1])) for p in corners], np.int32)], 1)
+        tan = cv2.merge([90 + base // 5, 140 + base // 5, 175 + base // 6])
+        world[strip == 1] = tan[strip == 1]
         for a, b in pitch_model.crease_segments():
             pa = to_world @ np.array([*a, 1.0])
             pb = to_world @ np.array([*b, 1.0])

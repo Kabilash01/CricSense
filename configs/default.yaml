@@ -22,6 +22,11 @@ camera:
   ransac_px: 3.0          # RANSAC inlier threshold, in pixels of the (downscaled) frame
   min_inliers: 80         # below this a frame is treated as not showing a calibrated view
   max_chain_frames: 25    # frames tracked via the previous frame before a direct match is required
+  # Skip feature matching on frames with almost no pitch-coloured ground (crowd, close-ups,
+  # graphics): same frames calibrated on the dev clip, 1.4x faster. 0 turns it off (a very
+  # green pitch elsewhere could fail a colour test). Half-resolution matching was also
+  # measured: 1.9x faster but corner error 1.8 -> 3.1 px median, 63 px p95 - rejected.
+  gate_min_pitch: 0.03
   # Per-frame estimates jitter by several px (0.5-1 m on the pitch) while the camera moves
   # smoothly: outliers vs the local median are replaced, then a Savitzky-Golay filter runs.
   smooth_window: 11       # frames (odd)

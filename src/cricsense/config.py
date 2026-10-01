@@ -44,6 +44,7 @@ class CameraOptions:
     smooth_window: int
     outlier_px: float
     overlay_mask: tuple[tuple[float, float, float, float], ...]
+    gate_min_pitch: float = 0.0  # skip a frame whose pitch-coloured share is below this (0: off)
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,7 @@ def _camera_options(raw: dict[str, Any]) -> CameraOptions:
             smooth_window=int(raw.get("smooth_window", 11)),
             outlier_px=float(raw.get("outlier_px", 6.0)),
             overlay_mask=tuple(tuple(float(v) for v in rect) for rect in raw.get("overlay_mask") or ()),
+            gate_min_pitch=float(raw.get("gate_min_pitch", 0.0)),
         )
     except KeyError as e:
         raise ConfigError(f"{where}.{e.args[0]} is missing") from None
