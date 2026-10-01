@@ -54,6 +54,8 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--no-propagate", action="store_true", help="save the reference view only")
     mode.add_argument("--propagate-only", action="store_true", help="recompute camera.json from the saved views")
     mode.add_argument("--auto", action="store_true", help="find the reference views from the painted creases, no clicks")
+    cal.add_argument("--cameras-from", type=Path, metavar="CALIBRATION_YAML",
+                     help="with --auto: where this match's cameras stand, from another clip's calibration (helps short clips)")
     mode.add_argument(
         "--import-views",
         type=Path,
@@ -114,6 +116,7 @@ def _calibrate(args: argparse.Namespace) -> int:
             propagate_only=args.propagate_only,
             import_views=args.import_views,
             auto=args.auto,
+            cameras_from=args.cameras_from,
         )
     except CalibrationError as e:
         print(f"cricsense calibrate: {e}", file=sys.stderr)

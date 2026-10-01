@@ -287,12 +287,14 @@ def _refine(best, dist, bottom_px, model, mask, steps=(4.0, 2.0, 1.0, 0.5)):
 
 
 ACCEPT = 0.72  # a frame this well explained by the regulation creases can join a view
-STRONG = 0.78  # a view needs a frame this good and one more agreeing frame, or ...
+STRONG = 0.78  # a view needs two agreeing frames this good, or ...
 SUPPORTED = 3  # ... this many agreeing frames (a batter on a crease can fool one or two frames)
-SAME_VIEW_PX = 90  # corners this close (median): the same fixed camera
+SAME_CAMERA_M = 6.0  # calibrations placing the camera this close: the same fixed camera
 
 
-def find_views(frames: dict[int, np.ndarray], bottom: float = 0.85) -> list[tuple[int, AutoCalibration, int]]:
+def find_views(
+    frames: dict[int, np.ndarray], bottom: float = 0.85, known_cameras: list[np.ndarray] | None = None
+) -> list[tuple[int, AutoCalibration, int]]:
     """Reference views for a video: [(frame_id, calibration, frames agreeing)] best first.
 
     Frames are calibrated independently; confident ones are grouped by camera (the broadcast
@@ -300,18 +302,29 @@ def find_views(frames: dict[int, np.ndarray], bottom: float = 0.85) -> list[tupl
     frames), and each group's best frame becomes the reference. A group of one is dropped:
     a single frame is not enough to trust a view."""
     found = [(f, r) for f, img in sorted(frames.items()) if (r := calibrate(img, bottom)) is not None and r.score >= ACCEPT]
+    # A broadcast camera turns and zooms but stays put, so calibrations of one camera place it at
+    # the same spot whatever the zoom; frames are grouped by that position, not by pixels.
+    from cricsense.calibration.camera_pose import CameraPose
+
+    size = next(iter(frames.values())).shape[1::-1] if frames else (1920, 1080)
     groups: list[list[tuple[int, AutoCalibration]]] = []
+    centres: list[np.ndarray] = []
     for f, r in sorted(found, key=lambda fr: -fr[1].score):
-        c = np.array([r.corners[n] for n in CORNER_NAMES])
-        for g in groups:
-            g0 = np.array([g[0][1].corners[n] for n in CORNER_NAMES])
-            if np.median(np.hypot(*(c - g0).T)) < SAME_VIEW_PX:
+        c = CameraPose.from_homography(r.image_to_pitch, size).centre
+        for g, c0 in zip(groups, centres):
+            if np.linalg.norm(c - c0) < SAME_CAMERA_M:
                 g.append((f, r))
                 break
         else:
             groups.append([(f, r)])
+            centres.append(c)
+    def known(c: np.ndarray) -> bool:  # where a camera of this match is already known to stand
+        return any(np.linalg.norm(c - k) < SAME_CAMERA_M for k in (known_cameras or []))
+
     return [
         (g[0][0], g[0][1], len(g))
-        for g in groups
-        if (len(g) >= 2 and g[0][1].score >= STRONG) or len(g) >= SUPPORTED
+        for g, c in zip(groups, centres)
+        if (len(g) >= 2 and all(r.score >= STRONG for _, r in g[:2]))
+        or len(g) >= SUPPORTED
+        or (known(c) and g[0][1].score >= STRONG)  # a short clip: one strong frame at a known camera
     ]

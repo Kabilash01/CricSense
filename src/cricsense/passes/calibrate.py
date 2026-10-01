@@ -106,6 +106,7 @@ def run_calibrate(
     import_views: Path | None = None,
     auto: bool = False,
     auto_step_s: float | None = None,
+    cameras_from: Path | None = None,
 ) -> CalibrateResult:
     video_id = video_id_from_path(video)
     resize = cfg.video.resize
@@ -123,7 +124,13 @@ def run_calibrate(
     elif auto:
         # dense enough that a short clip still yields a few frames of each view, sparse for a match
         step = auto_step_s if auto_step_s is not None else min(2.0, max(0.5, meta.n_frames / meta.fps / 150))
-        calibration, check_path = _auto_views(cfg, video, meta, step, out_dir)
+        known = None
+        if cameras_from is not None:  # the same match's cameras, from another clip's calibration
+            from cricsense.calibration.camera_pose import CameraPose
+
+            donor = read_yaml_doc(cameras_from, CalibrationDoc)
+            known = [CameraPose.from_homography(np.array(v.image_to_pitch), tuple(donor.image_size)).centre for v in donor.views]
+        calibration, check_path = _auto_views(cfg, video, meta, step, out_dir, known)
         write_yaml_doc(calibration, cal_path)
         log.info("wrote %s with %d automatic views", cal_path, len(calibration.views))
     elif import_views is not None:
@@ -169,11 +176,11 @@ def run_calibrate(
     return CalibrateResult(cal_path, check_path, camera_path, view, camera)
 
 
-def _auto_views(cfg: Config, video: Path, meta, step_s: float, out_dir: Path) -> tuple[CalibrationDoc, Path]:
+def _auto_views(cfg: Config, video: Path, meta, step_s: float, out_dir: Path, known=None) -> tuple[CalibrationDoc, Path]:
     """Reference views without clicks: see cricsense.calibration.auto."""
     step = max(1, int(round(step_s * meta.fps)))
     frames = read_frames(video, range(0, meta.n_frames, step), cfg.video.resize)
-    views = find_views(frames)
+    views = find_views(frames, known_cameras=known)
     if not views:
         raise CalibrationError("no frame shows the pitch's creases clearly enough to calibrate automatically")
     refs = []

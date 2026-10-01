@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--legal", type=int, default=15)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--cameras-from", type=Path, help="another clip's calibration of the same match (helps short clips)")
     args = parser.parse_args(argv)
 
     from cricsense.io import read_doc
@@ -82,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             out = ROOT / "outputs" / clip
             if not (out / "camera.json").is_file():
-                cricsense("calibrate", "--video", video, "--auto")
+                cricsense("calibrate", "--video", video, "--auto", *(["--cameras-from", str(args.cameras_from)] if args.cameras_from else []))
             for step, target in (("scoreboard", "scoreboard.json"), ("players", "players.json"), ("ball", "ball.json")):
                 if not (out / target).is_file():
                     cricsense(step, "--video", video)
