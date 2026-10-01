@@ -2,6 +2,72 @@
 # The clips are video-only; the render takes the stadium sound from the source at this offset.
 # Offsets were matched frame by frame against the broadcast (the clip names are not the start).
 clips:
-  final_0050_10s: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 3000.0}
-  final_0051_6min: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 3055.0}
-  final_0051_30s: {source: "Cricket match/replay-final-sa-vs-ind.mp4", start_s: 3058.0}
+  final_0050_10s:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3000.0
+  final_0051_30s:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3058.0
+  final_0051_6min:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3055.0
+  we_legal_0_4:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 106.92
+  we_legal_10_1:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 2704.2
+  we_legal_10_3:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 2814.6
+  we_legal_11_1:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3010.44
+  we_legal_13_1:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3567.24
+  we_legal_13_2:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3576.36
+  we_legal_13_6:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3882.6
+  we_legal_14_5:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4129.8
+  we_legal_15_2:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4269.48
+  we_legal_16_1:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4449.96
+  we_legal_16_2:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4480.2
+  we_legal_17_2:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4767.72
+  we_legal_17_5:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4947.24
+  we_legal_17_6:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4979.88
+  we_legal_18_6:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 5438.76
+  we_wide_10_6:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 2918.76
+  we_wide_12_5:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3393.48
+  we_wide_13_3:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 3639.24
+  we_wide_17_5:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 4887.24
+  we_wide_19_1:
+    source: Cricket match/replay-final-sa-vs-ind.mp4
+    start_s: 5503.08

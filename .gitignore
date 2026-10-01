@@ -32,3 +32,6 @@ CLAUDE.local.md
 
 # Secrets (Roboflow API key)
 .env
+
+# benchmark clips (scripts/wide_eval.py): calibrations are regenerated automatically
+configs/calibration/we_*.yaml
