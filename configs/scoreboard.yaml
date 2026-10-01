@@ -42,6 +42,8 @@ anchor:
   width: [90, 230]
   height: [28, 75]
   overs_right: [8, 175]
+  bar_band: [250, 915, 1350, 1030]   # where the bar's white panels are, whatever variant
+  bar_white_min: 0.12                # white share there: 0.15-0.31 with a bar, ~0 without
 
 sample_every: 12             # frames between reads (0.5 s at 25 fps); the bar changes slowly
 

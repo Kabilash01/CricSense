@@ -161,6 +161,8 @@ class ScoreboardReader:
         reading = self._read_fields(image, frame_id, t) if self.is_visible(image) else None
         if not self.layout.anchor or (reading is not None and reading.runs is not None and reading.legal_balls is not None):
             return reading
+        if reading is None and not self._bar_present(image):
+            return None  # an advert, a replay, a close-up: no bar to look for
         found = self._find_score_box(image)
         if found is None:
             return reading
@@ -178,6 +180,14 @@ class ScoreboardReader:
             "legal_balls": parse_overs(overs),
             "raw": {**base.raw, "variant": "score box", "score": f"{runs}-{wickets}", "overs": overs},
         })
+
+    def _bar_present(self, image: np.ndarray) -> bool:
+        """The bar's white panels across its band: 0.15-0.31 on every bar variant seen, ~0 on
+        adverts and close-ups. Only spares the score-box search on frames with no bar."""
+        a = self.layout.anchor
+        x0, y0, x1, y1 = self._scaled(image, tuple(a["bar_band"]))
+        hsv = cv2.cvtColor(image[y0:y1, x0:x1], cv2.COLOR_BGR2HSV)
+        return hsv.size > 0 and float(((hsv[..., 2] > 200) & (hsv[..., 1] < 45)).mean()) >= a["bar_white_min"]
 
     def _find_score_box(self, image: np.ndarray) -> tuple[int, int, tuple[int, int, int, int]] | None:
         """(runs, wickets, box x, y, w, h in pixels) of a coloured box whose white digits read as a score."""

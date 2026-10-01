@@ -15,7 +15,14 @@ from cricsense.schema import RunInfo, ScoreboardDoc
 log = logging.getLogger("cricsense.scoreboard")
 
 
-def run_scoreboard(cfg: Config, video: Path, layout_path: Path | None = None) -> tuple[ScoreboardDoc, Path]:
+def run_scoreboard(
+    cfg: Config,
+    video: Path,
+    layout_path: Path | None = None,
+    start_s: float | None = None,
+    end_s: float | None = None,
+    out_name: str = "scoreboard.json",
+) -> tuple[ScoreboardDoc, Path]:
     layout = ScoreboardLayout.from_yaml(layout_path or cfg.root / "configs" / "scoreboard.yaml")
     sheet_path = cfg.root / "configs" / "match.yaml"
     squad = MatchSheet.from_yaml(sheet_path).all_names if sheet_path.is_file() else ()
@@ -23,7 +30,11 @@ def run_scoreboard(cfg: Config, video: Path, layout_path: Path | None = None) ->
     video_id = video_id_from_path(video)
     readings = []
     t0 = time.perf_counter()
-    with VideoReader(video, skip=layout.sample_every, resize=cfg.video.resize) as frames:
+    with VideoReader(video, resize=cfg.video.resize) as probe:
+        fps = probe.fps
+    start = int(round((start_s or 0) * fps))
+    end = None if end_s is None else int(round(end_s * fps))
+    with VideoReader(video, skip=layout.sample_every, start=start, end=end, resize=cfg.video.resize) as frames:
         meta = frames.meta(video_id)
         sampled = 0
         for frame in frames:
@@ -31,9 +42,11 @@ def run_scoreboard(cfg: Config, video: Path, layout_path: Path | None = None) ->
             reading = reader.read(frame.image, frame.frame_id, frame.t)
             if reading is not None:
                 readings.append(reading)
+            if sampled % 2000 == 0:
+                log.info("at %.0f s of the video: %d readings, %d OCR calls, %.0f s elapsed", frame.t, len(readings), reader.ocr_calls, time.perf_counter() - t0)
     run = RunInfo(wall_time_s=time.perf_counter() - t0, frames_processed=sampled, device="cpu")
     doc = ScoreboardDoc(video=meta, run=run, layout=layout.name, readings=readings)
-    path = write_doc(doc, cfg.output_dir_for(video_id) / "scoreboard.json")
+    path = write_doc(doc, cfg.output_dir_for(video_id) / out_name)
     log.info("wrote %s (%d readings, %d OCR calls)", path, len(readings), reader.ocr_calls)
     return doc, path
 

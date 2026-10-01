@@ -68,6 +68,10 @@ def build_parser() -> argparse.ArgumentParser:
         _scoreboard,
         video=True,
     )
+    sb = sub.choices["scoreboard"]
+    sb.add_argument("--start", type=float, help="first second to read (default: the start)")
+    sb.add_argument("--end", type=float, help="last second to read (default: the end)")
+    sb.add_argument("--out-name", default="scoreboard.json", help="output file name inside outputs/<video_id>/")
     pl = add("players", "GPU pass: player tracks, stable IDs, roles, identities -> players.json", _players, video=True)
     pl.add_argument("--tracker", type=Path, help="tracker config (default: configs/players.yaml tracker.config)")
     pl.add_argument("--out-name", default="players.json", help="output file name inside outputs/<video_id>/")
@@ -141,7 +145,7 @@ def _scoreboard(args: argparse.Namespace) -> int:
     from cricsense.passes.scoreboard import run_scoreboard, summarize
 
     setup_logging()
-    doc, path = run_scoreboard(load_config(), args.video)
+    doc, path = run_scoreboard(load_config(), args.video, start_s=args.start, end_s=args.end, out_name=args.out_name)
     print("\n".join(summarize(doc, path)))
     return 0
 
