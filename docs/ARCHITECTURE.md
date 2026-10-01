@@ -1,7 +1,12 @@
-# CricSense — Architecture
+# CricSense — Architecture (original design)
+
+> **This is the design written before the build (September 2026).** The system as built -
+> automatic calibration, the score engine, commentary, voice, storage and API, live mode -
+> and what was measured is described in [REPORT.md](REPORT.md); what was tried and dropped,
+> with its measurements, in [decisions.md](decisions.md). Kept for the record of the plan.
 
 **Audience:** anyone picking up this codebase, including future-you before the lab exam.
-**Companion docs:** [ADR-001](adr/ADR-001-repository-merge-and-runtime-model.md) for *why* this shape, [SETUP.md](../SETUP.md) for *how* to build it from the two source repos.
+**Companion docs:** [ADR-001](adr/ADR-001-repository-merge-and-runtime-model.md) for *why* this shape, [SETUP-merge.md](history/SETUP-merge.md) for *how* it was built from the two source repos.
 
 ---
 
