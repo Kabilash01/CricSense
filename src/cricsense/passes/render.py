@@ -75,8 +75,10 @@ class _Writer:
                 # the crowd ducks under the commentator (sidechain), then both are mixed
                 cmd += [
                     "-filter_complex",
-                    "[2:a]aresample=48000,asplit=2[sc][cm];[1:a:0]aresample=48000[bg];"
-                    "[bg][sc]sidechaincompress=threshold=0.02:ratio=8:attack=20:release=450[duck];"
+                    # commentary well above the crowd, as broadcasts mix it: the crowd bed lowered,
+                    # the voice raised, and the crowd ducked hard while the commentator speaks
+                    "[2:a]aresample=48000,volume=1.8,asplit=2[sc][cm];[1:a:0]aresample=48000,volume=0.6[bg];"
+                    "[bg][sc]sidechaincompress=threshold=0.008:ratio=14:attack=15:release=500[duck];"
                     "[duck][cm]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[a]",
                     "-map", "0:v", "-map", "[a]",
                 ]

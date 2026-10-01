@@ -1,5 +1,7 @@
 """`cricsense voice`: commentary.json -> commentary.wav (the spoken track) + voice.json.
 
+The engine is configs/commentary.yaml tts.engine: kokoro (local, default) or gemini.
+
 voice.json records where each line landed ({start_s, end_s, text, kind}) - later than
 planned if the line before ran on - which the render uses for captions.
 """
@@ -23,14 +25,14 @@ def run_voice(cfg: Config, video_id: str) -> tuple[Path, list[dict], list[str]]:
     out_dir = cfg.output_dir_for(video_id)
     doc = read_doc(out_dir / "commentary.json", CommentaryDoc)
     raw = (cfg.commentary.get("tts") or {})
-    tcfg = TTSConfig(model=raw.get("model", TTSConfig.model), voice=raw.get("voice", TTSConfig.voice))
-    key = api_key(LLMConfig("gemini", tcfg.model, key_env=raw.get("key_env")), cfg.root)
+    tcfg = TTSConfig(**{k: raw[k] for k in ("engine", "model", "voices", "voice") if k in raw})
+    key = api_key(LLMConfig("gemini", tcfg.model, key_env=raw.get("key_env")), cfg.root) if tcfg.engine == "gemini" else None
     cache = ClipCache(out_dir / "tts")
     clips, texts, problems = [], [], []
     for line in doc.lines:
         style = style_for(line.kind, line.text)
         try:
-            x = cache.get_or_make(tcfg, key, line.text, style)
+            x = cache.get_or_make(tcfg, key, line.text, style, cfg.root)
         except Exception as e:  # one failed line must not cost the whole track
             problems.append(f"{line.t:6.1f}s  not spoken ({type(e).__name__}: {e})")
             continue

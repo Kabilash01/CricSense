@@ -84,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
     co = add("commentary", "commentary lines per ball from the facts (LLM checked against them, or templates) -> commentary.json", _commentary, video_id=True)
     co.add_argument("--engine", choices=["auto", "llm", "template"], help="default: configs/commentary.yaml engine")
     co.add_argument("--no-vlm", action="store_true", help="skip shot type / direction from the vision model")
-    add("voice", "speak the commentary (Gemini TTS) -> commentary.wav + voice.json", _voice, video_id=True)
+    add("voice", "speak the commentary (local Kokoro TTS, or Gemini) -> commentary.wav + voice.json", _voice, video_id=True)
     rn = add("render", "draw overlay.mp4 and pitch_map.png from the pass outputs", _render, video_id=True)
     rn.add_argument("--start", type=float, help="first second to render (default: the start)")
     rn.add_argument("--end", type=float, help="last second to render (default: the end)")
@@ -92,7 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     rn.add_argument("--no-voice", action="store_true", help="leave the commentary audio and captions out")
     ru = add("run", "every pass on one video, in order: calibrate (automatic if needed) ... render", _run, video=True)
     ru.add_argument("--fresh", nargs="*", default=[], metavar="STEP", help="re-run these steps even if their output exists (or: all)")
-    ru.add_argument("--voice", action="store_true", help="also speak the commentary (needs a TTS key)")
+    ru.add_argument("--voice", action="store_true", help="also speak the commentary (local Kokoro by default)")
     add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
     return parser
 

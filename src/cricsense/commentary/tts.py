@@ -1,9 +1,12 @@
 """Text-to-speech for the commentary lines, and the commentary audio track.
 
-Gemini TTS over its REST Interactions endpoint (free tier; no model runs locally, so no
-memory is used here). Each line gets a delivery style to match it - brisk as the ball is
-played, excited for a boundary or a wicket, calm for the score - and is cached as a WAV
-file, so a re-run makes no new calls. The track is the length of the clip with each line
+Two engines:
+  kokoro  local, free, no key: the Kokoro 82M model, int8 ONNX (~90 MB, ~0.4 GB of memory,
+          CPU at ~0.5x real time); delivery is set by pace (it takes no style prompt);
+  gemini  Gemini TTS over its REST Interactions endpoint (free tier, needs GEMINI_API_KEY);
+          delivery is set by a style prompt.
+Each line gets a delivery to match it - brisk as the ball is played, excited for a boundary
+or a wicket, calm for the score - and is cached as a WAV file, so a re-run synthesises nothing. The track is the length of the clip with each line
 placed at its time; a line that runs past the next one pushes it later, never overlaps it.
 """
 
@@ -32,9 +35,24 @@ STYLES = {
 
 @dataclass(frozen=True)
 class TTSConfig:
-    model: str = "gemini-3.8-flash-tts"
-    voice: str = "Sadaltager"  # "Knowledgeable"
+    engine: str = "kokoro"  # kokoro | gemini
+    model: str = "models/tts/kokoro-v1.0.int8.onnx"  # kokoro: the ONNX file; gemini: the model id
+    voices: str = "models/tts/voices-v1.0.bin"  # kokoro only
+    voice: str = "bm_george"  # kokoro: a British male voice; gemini e.g. "Sadaltager"
     timeout_s: float = 60.0
+
+
+PACE = {"ball": 1.1, "big": 1.2, "after": 1.0}  # kokoro: speaking rate per kind of line
+_KOKORO = {}
+
+
+def _kokoro(cfg: TTSConfig, root):
+    key = (cfg.model, cfg.voices)
+    if key not in _KOKORO:
+        from kokoro_onnx import Kokoro
+
+        _KOKORO[key] = Kokoro(str(root / cfg.model), str(root / cfg.voices))
+    return _KOKORO[key]
 
 
 def style_for(kind: str, text: str) -> str:
@@ -43,8 +61,20 @@ def style_for(kind: str, text: str) -> str:
     return STYLES["after" if kind == "after" else "ball"]
 
 
-def synthesize(cfg: TTSConfig, key: str, text: str, style: str) -> np.ndarray:
+def synthesize(cfg: TTSConfig, key: str | None, text: str, style: str, root=None) -> np.ndarray:
     """Mono float32 samples at RATE."""
+    if cfg.engine == "kokoro":
+        from pathlib import Path as _P
+
+        kind = next((k for k, v in STYLES.items() if v == style), "ball")
+        audio, sr = _kokoro(cfg, root or _P.cwd()).create(text, voice=cfg.voice, speed=PACE[kind], lang="en-gb")
+        x = np.asarray(audio, np.float32)
+        if sr != RATE:
+            n = int(round(len(x) * RATE / sr))
+            x = np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x).astype(np.float32)
+        return x
+    if key is None:
+        raise RuntimeError("gemini TTS needs GEMINI_API_KEY")
     body = {
         "model": cfg.model,
         "input": [{"type": "user_input", "content": [{"type": "text", "text": text, "annotations": [{"type": "speech_metadata", "style": style, "speaker": "Commentator"}]}]}],
@@ -93,16 +123,14 @@ class ClipCache:
         folder.mkdir(parents=True, exist_ok=True)
 
     def path(self, cfg: TTSConfig, text: str, style: str) -> Path:
-        h = hashlib.sha256(json.dumps([cfg.model, cfg.voice, text, style]).encode()).hexdigest()[:20]
+        h = hashlib.sha256(json.dumps([cfg.engine, cfg.model, cfg.voice, text, style]).encode()).hexdigest()[:20]
         return self.folder / f"{h}.wav"
 
-    def get_or_make(self, cfg: TTSConfig, key: str | None, text: str, style: str) -> np.ndarray:
+    def get_or_make(self, cfg: TTSConfig, key: str | None, text: str, style: str, root=None) -> np.ndarray:
         p = self.path(cfg, text, style)
         if p.is_file():
             return read_wav(p.read_bytes())
-        if key is None:
-            raise RuntimeError("no TTS key and no cached clip")
-        x = synthesize(cfg, key, text, style)
+        x = synthesize(cfg, key, text, style, root)
         write_wav(p, x)
         return x
 

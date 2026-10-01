@@ -20,6 +20,9 @@ max_words:              # caps; the time before the next ball can make them smal
   ball: 22
   after: 24
 
-tts:                    # Gemini TTS (free tier): needs GEMINI_API_KEY - Lightning AI has no speech API
-  model: gemini-3.8-flash-tts
-  voice: Sadaltager     # "knowledgeable"; others: Fenrir (excitable), Puck (upbeat), Charon (informative)
+tts:                    # spoken commentary (cricsense voice)
+  engine: kokoro        # kokoro: local, free, no key (~90 MB model, ~0.4 GB memory) | gemini: needs GEMINI_API_KEY
+  model: models/tts/kokoro-v1.0.int8.onnx
+  voices: models/tts/voices-v1.0.bin
+  voice: bm_george      # a British male voice; others: bm_lewis, bm_daniel, am_michael
+  # gemini: engine gemini, model gemini-3.8-flash-tts, voice Sadaltager
