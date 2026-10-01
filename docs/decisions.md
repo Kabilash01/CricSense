@@ -140,3 +140,18 @@ With the LLM cache cleared (for the benchmark) the VLM's posture readings change
 went from "slog sweep" to "cover drive", Kohli's 11.2 from "back-foot punch" to "slog sweep".
 The cache had hidden this. Shot type stays labelled "AI read"; to make it trustworthy, read
 each shot several times and keep only answers that agree.
+
+## Live mode (`cricsense live`): score and outcomes live; length and line need a free GPU
+
+A reader thread plays the source at its own pace and offers frames to workers that drop what
+they cannot keep up with. 150 s of the dev clip played in real time (151.5 s), with another
+training job on the GPU:
+- score, each ball's outcome, boundaries, wickets, radar: all 5 balls right (incl. the six),
+  emitted a median 1.8 s after the score bar settled (8 s for the first, warming up); radar
+  median 0.8 s.
+- length and line: main-view shots are noticed every few frames and processed when they end
+  (re-tracked in order from a frame buffer, both ball models at full resolution, in their own
+  thread so the next shot is not missed). 4 shots noticed; but beside another job on the GPU a
+  shot takes over a minute (memory falls back to one frame at a time, then the CPU), and the
+  two processed had no bounce (offline: one inferred, one none). Needs a free GPU or faster
+  inference (FP16/TensorRT, a crop around the pitch); not claimed as working live.

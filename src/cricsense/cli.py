@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import dataclasses
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
 # Subcommand -> the build phase that implements it. Removed from here as each phase lands.
-_PENDING_PHASE = {
-    "live": 7,
-}
+_PENDING_PHASE: dict[str, int] = {}  # commands not built yet -> their build phase (none left)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -97,7 +96,14 @@ def build_parser() -> argparse.ArgumentParser:
     sv = add("serve", "the HTTP API: upload videos, read deliveries, events, scorecard, commentary, files", _serve)
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8000)
-    add("live", "demo: players + ball + fuse in one loop (degraded, optional)", video=True)
+    lv = add("live", "live mode: score, outcomes, speed, bounce on a stream as it plays; overlay + latency report", _live)
+    src = lv.add_mutually_exclusive_group(required=True)
+    src.add_argument("--video", type=Path, help="a file, played back at its own pace")
+    src.add_argument("--url", help="a stream (rtsp://, rtmp://, http://)")
+    lv.add_argument("--calibration", type=Path, required=True, help="the match's reference views (configs/calibration/<clip>.yaml)")
+    lv.add_argument("--out", type=Path, help="write the live overlay here (mp4)")
+    lv.add_argument("--seconds", type=float, help="stop after this much of the source")
+    lv.add_argument("--fast", action="store_true", help="a file as fast as possible instead of at its own pace")
     return parser
 
 
@@ -252,6 +258,25 @@ def _serve(args: argparse.Namespace) -> int:
     setup_logging()
     cfg = load_config()
     uvicorn.run(create_app(cfg, db.connect(store_config(cfg)["database_url"])), host=args.host, port=args.port)
+    return 0
+
+
+def _live(args: argparse.Namespace) -> int:
+    import os
+
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")  # a shared GPU fragments
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.live.runner import run_live, write_report
+
+    setup_logging()
+    cfg = load_config()
+    source = str(args.video) if args.video else args.url
+    report = run_live(cfg, source, args.out, args.calibration, args.seconds, realtime=not args.fast)
+    path = (args.out.parent if args.out else cfg.paths.output_dir / "live") / "live_report.json"
+    write_report(report, path)
+    print(json.dumps({k: report[k] for k in ("source_seconds", "wall_seconds", "reader_late_frames", "workers", "latency_s")}, indent=1))
+    print(f"events: {len(report['events'])}; report: {path}")
     return 0
 
 

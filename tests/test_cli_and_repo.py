@@ -18,13 +18,10 @@ def test_help_lists_every_subcommand():
         assert re.search(rf"^\s+{name}\s", out, re.MULTILINE), name
 
 
-@pytest.mark.parametrize(
-    "argv",
-    [["live", "--video", "x.mp4"]],
-)
-def test_unbuilt_commands_fail_loudly(argv, capsys):
-    assert main(argv) == 2
-    assert "not implemented yet" in capsys.readouterr().err
+def test_every_command_is_built():
+    from cricsense import cli
+
+    assert not getattr(cli, "_PENDING_PHASE", {})
 
 
 def test_required_args_enforced():
