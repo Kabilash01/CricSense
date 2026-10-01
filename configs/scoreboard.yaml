@@ -31,6 +31,18 @@ striker_icon:
   hue: [18, 40]
   min_fraction: 0.03
 
+# Where the layout misses the score (the bar sits ~20 px higher or slides sideways at times; the
+# chase shows a compact bar with the score moved left), the pink score box is found by colour
+# inside `band`, its white digits read, and the overs to its right: a score-only reading.
+anchor:
+  hue: [150, 179]
+  min_sat: 110
+  min_val: 140
+  band: [912, 992]
+  width: [90, 230]
+  height: [28, 75]
+  overs_right: [8, 175]
+
 sample_every: 12             # frames between reads (0.5 s at 25 fps); the bar changes slowly
 
 # Squads for snapping OCR slips to real names live in configs/match.yaml.

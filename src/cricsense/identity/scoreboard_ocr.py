@@ -41,6 +41,7 @@ class ScoreboardLayout:
     icon_hue: tuple[int, int]
     icon_min_fraction: float
     sample_every: int
+    anchor: dict | None = None  # the score box, found by colour where the layout misses it (see read)
 
     @classmethod
     def from_yaml(cls, path: Path) -> ScoreboardLayout:
@@ -56,6 +57,7 @@ class ScoreboardLayout:
             striker_icons=(tuple(icon["batter1"]), tuple(icon["batter2"])),
             icon_hue=tuple(icon["hue"]),
             icon_min_fraction=float(icon["min_fraction"]),
+            anchor=raw.get("anchor"),
             sample_every=int(raw.get("sample_every", 12)),
         )
 
@@ -149,8 +151,67 @@ class ScoreboardReader:
         return marks.index(True) if marks.count(True) == 1 else None
 
     def read(self, image: np.ndarray, frame_id: int, t: float) -> ScoreboardReading | None:
-        if not self.is_visible(image):
-            return None
+        """The bar's fields, from the layout's rectangles. Where they miss the score - at times
+        the bar sits ~20 px higher or slides sideways, and in a chase a compact bar shows the
+        score beside "NEED 26 FROM 24 BALLS" - the score box is found by its colour and its
+        digits read, with the overs to its right: a score-only reading (other fields are kept
+        only if the layout read them). Panels shift independently, so the other fields are not
+        re-read from the box's offset; a misread score is caught downstream by the rule that a
+        score cannot go backwards or faster than the game."""
+        reading = self._read_fields(image, frame_id, t) if self.is_visible(image) else None
+        if not self.layout.anchor or (reading is not None and reading.runs is not None and reading.legal_balls is not None):
+            return reading
+        found = self._find_score_box(image)
+        if found is None:
+            return reading
+        runs, wickets, (bx, by, bw, bh) = found
+        ox0, ox1 = self.layout.anchor["overs_right"]
+        overs = self._tesseract(cv2.cvtColor(image[by : by + bh, bx + bw + ox0 : bx + bw + ox1], cv2.COLOR_BGR2GRAY), "overs")
+        base = reading or ScoreboardReading(
+            frame_id=frame_id, t=t, batters=[BatterLine(name=None, runs=None, balls=None, on_strike=False)] * 2,
+            runs=None, legal_balls=None, bowler=None, bowler_runs=None, bowler_legal_balls=None,
+        )
+        return base.model_copy(update={
+            "runs": runs,
+            "wickets": _within(wickets, 0, 10),
+            "legal_balls": parse_overs(overs),
+            "raw": {**base.raw, "variant": "score box", "score": f"{runs}-{wickets}", "overs": overs},
+        })
+
+    def _find_score_box(self, image: np.ndarray) -> tuple[int, int, tuple[int, int, int, int]] | None:
+        """(runs, wickets, box x, y, w, h in pixels) of a coloured box whose white digits read as a score."""
+        a = self.layout.anchor
+        h_img = image.shape[0]
+        y0, y1 = (round(v * h_img / self.layout.reference_size[1]) for v in a["band"])
+        hsv = cv2.cvtColor(image[y0:y1], cv2.COLOR_BGR2HSV)
+        lo, hi = a["hue"]
+        mask = ((hsv[..., 0] >= lo) & (hsv[..., 0] <= hi) & (hsv[..., 1] > a["min_sat"]) & (hsv[..., 2] > a["min_val"])).astype(np.uint8)
+        # the score's white digits split the box: close them over
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (31, 9)))
+        _, _, stats, _ = cv2.connectedComponentsWithStats(mask)
+        (wmin, wmax), (hmin, hmax) = a["width"], a["height"]
+        for x, y, w, h, _ in sorted((tuple(int(v) for v in st) for st in stats[1:]), key=lambda st: -st[4]):
+            if not (wmin <= w <= wmax and hmin <= h <= hmax and 1.8 <= w / h <= 5.5):
+                continue
+            # only the rows that are the box itself: a border or graphic above it is not text
+            rows = np.where(mask[y : y + h, x : x + w].mean(axis=1) > 0.5)[0]
+            if len(rows) < hmin:
+                continue
+            y, h = y + int(rows.min()), int(rows.max() - rows.min() + 1)
+            roi = cv2.cvtColor(image[y0 + y : y0 + y + h, x : x + w], cv2.COLOR_BGR2HSV)
+            white = ((roi[..., 2] > 200) & (roi[..., 1] < 80)).astype(np.uint8) * 255  # the digits
+            text_img = cv2.copyMakeBorder(
+                255 - cv2.resize(white, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST), 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255
+            )
+            self.ocr_calls += 1
+            text = pytesseract.image_to_string(text_img, config="--psm 7 -c tessedit_char_whitelist=0123456789-/")
+            # the box's rounded corners can read as a leading "-": search, do not match whole
+            m = re.search(r"(\d{1,3})[-/](\d{1,2})", text.replace(" ", ""))
+            if m:
+                return int(m.group(1)), int(m.group(2)), (x, y0 + y, w, h)
+        return None
+
+    def _read_fields(self, image: np.ndarray, frame_id: int, t: float) -> ScoreboardReading:
         raw = {name: self._ocr(image, rect, name) for name, rect in self.layout.fields.items()}
         striker = self.striker_index(image)
         squad = self.squad_names

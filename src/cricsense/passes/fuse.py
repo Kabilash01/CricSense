@@ -21,7 +21,7 @@ from pathlib import Path
 from cricsense.ball.candidates import detect_candidates
 from cricsense.config import Config
 from cricsense.fuse.contact import find_contact
-from cricsense.fuse.outcome import outcome, trusted_states
+from cricsense.fuse.outcome import batting_side, outcome, score_track, trusted_states
 from cricsense.fuse.score_engine import score_innings
 from cricsense.identity.match_sheet import MatchSheet
 from cricsense.io import read_doc, write_doc
@@ -54,6 +54,8 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
     t0 = time.perf_counter()
 
     states = trusted_states(board.readings, squad, team_of) if board else []
+    starts = [b.t for a, b in zip(states, states[1:]) if batting_side(a, team_of) != batting_side(b, team_of)]
+    track = score_track(board.readings, starts) if board else []
     by_frame_role: dict[int, dict[Role, tuple[int, tuple]]] = defaultdict(dict)
     if players:
         for f in players.frames:
@@ -96,12 +98,12 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
     per_ball = []
     for i, d in enumerate(ball.deliveries):
         nxt = releases[i + 1] if i + 1 < len(releases) else None
-        res = outcome(states, d.release_t, nxt) if states else None
+        res = outcome(states, d.release_t, nxt, track) if (states or track) else None
         per_ball.append((d.delivery_id, d.release_frame, d.release_t, res))
         actors = actors_at(d.release_frame)
         names = {}
         if res:
-            names = {"bowler": res.bowler, "striker": res.striker}
+            names = {k: v for k, v in (("bowler", res.bowler), ("striker", res.striker)) if v}
             names["over"] = f"{res.before.legal_balls // 6}.{res.before.legal_balls % 6 + 1}"
         speed = {"radar_speed_kph": d.radar_speed_kph} if d.radar_speed_kph else {}
         if d.speed_estimate_kph and d.bounce_confirmed:  # shown as "≈", always labelled an estimate
@@ -126,7 +128,7 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
             )
         centre = bounce_frame if bounce_frame is not None else d.release_frame + int(0.7 * fps)
         contact = find_contact(bats, balls, centre, striker_box(centre), size, cfg.camera.overlay_mask)
-        credited = res is not None and res.off_bat > 0
+        credited = res is not None and (res.off_bat or 0) > 0
         if contact is not None:
             add(
                 contact.frame_id,

@@ -54,13 +54,15 @@ def outcome_phrase(f: BallFacts) -> str | None:
     if f.kind == "wide":
         extra = f", {f.runs - 1} more run" + ("s" if f.runs - 1 != 1 else "") + " to go with it" if f.runs > 1 else ""
         return f"and that's called wide{extra}"
+    if f.kind == "extra":
+        return f"and that's an extra, {f.runs} added"
     if f.kind == "no_ball":
         return f"and it's a no-ball! {f.runs} added, free hit to come"
     if f.boundary == "SIX":
         return _pick([f"and {s} sends it into the stands, SIX!", f"SIX! {s} launches it", f"{s} clears the rope, that's SIX"], f)
     if f.boundary == "FOUR":
         return _pick([f"and {s} finds the rope, FOUR!", f"FOUR! {s} beats the field", f"{s} times it away, four runs"], f)
-    if f.off_bat == 0 and f.extras:
+    if f.off_bat is not None and f.off_bat == 0 and f.extras:
         return f"{f.extras} extra run" + ("s" if f.extras > 1 else "") + " as they scamper through"
     if f.runs == 0:
         if f.bat_contact:

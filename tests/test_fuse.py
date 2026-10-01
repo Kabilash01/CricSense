@@ -97,3 +97,19 @@ def test_a_score_jumping_faster_than_the_game_allows_is_a_misread():
         *seen(80, 7, 0, 7, (5, 5), (1, 2)),  # the genuine next ball
     ]
     assert [(s.runs, s.legal_balls) for s in trusted_states(rs, SQUAD)] == [(6, 6), (7, 7)]
+
+
+def test_score_only_readings_give_runs_and_legal_or_extra():
+    from cricsense.fuse.outcome import score_track
+
+    def score_only(t, runs, wkts, balls):
+        return [ScoreboardReading(frame_id=int(x * 25), t=x, batters=[BatterLine(name=None, runs=None, balls=None, on_strike=False)] * 2,
+                                  runs=runs, wickets=wkts, legal_balls=balls, bowler=None, bowler_runs=None, bowler_legal_balls=None)
+                for x in (t, t + 0.5)]
+    rs = [*score_only(0, 120, 4, 84), *score_only(30, 126, 4, 85), *score_only(60, 127, 4, 85)]
+    track = score_track(rs)
+    assert [(s.runs, s.legal_balls) for s in track] == [(120, 84), (126, 85), (127, 85)]
+    six = outcome([], 10.0, 40.0, track)
+    assert (six.kind, six.runs, six.boundary, six.striker, six.off_bat) == ("legal", 6, "SIX", None, None)
+    extra = outcome([], 45.0, 90.0, track)
+    assert (extra.kind, extra.runs) == ("extra", 1)

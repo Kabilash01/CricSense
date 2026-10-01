@@ -134,6 +134,8 @@ class Scene:
                     outcome = f"WIDE +{q['runs']}"
                 elif q["kind"] == "no_ball":
                     outcome = f"NO BALL +{q['runs']}"
+                elif q["kind"] == "extra":
+                    outcome = f"EXTRA +{q['runs']}"
                 else:
                     outcome = "DOT BALL" if q["runs"] == 0 else f"{q['runs']} RUN" + ("S" if q["runs"] > 1 else "")
                 if outcome in OUTCOME_COLORS:
