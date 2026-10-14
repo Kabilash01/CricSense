@@ -10,13 +10,18 @@ START ?=
 END   ?=
 export PYTORCH_CUDA_ALLOC_CONF := expandable_segments:True
 
-.PHONY: help doctor test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
+.PHONY: help doctor models test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
 
 help:  ## list the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
 
 doctor:  ## is this machine ready? (programs, packages, models, GPU, keys)
 	$(PY) scripts/doctor.py
+
+models:  ## download the public models (YOLO, pose, Kokoro voice; ~300 MB); custom ones: README
+	$(PY) -c "from ultralytics import YOLO; [YOLO(m) for m in ('models/yolov8m.pt', 'models/yolo11x-pose.pt')]"
+	mkdir -p models/tts
+	cd models/tts && for f in kokoro-v1.0.int8.onnx voices-v1.0.bin; do test -f $$f || curl -fL -o $$f https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$$f; done
 
 test:  ## the unit tests (~30 s)
 	$(PY) -m pytest -q

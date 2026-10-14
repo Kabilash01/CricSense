@@ -45,9 +45,18 @@ pip install -r requirements.txt          # torch 2.14 (CUDA 13) runs on RTX 50-s
 sudo pacman -S tesseract ffmpeg postgresql   # or your distribution's packages
 ```
 
-Models go in `models/` (not in git): `ball_best.pt`, `ball_ft.pt`, `bat_best.pt`, `yolov8m.pt`,
-`yolo11x-pose.pt`, and `tts/kokoro-v1.0.int8.onnx` + `tts/voices-v1.0.bin`
-([kokoro-onnx model files](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)).
+Models go in `models/` (not in git):
+
+- `make models` downloads the public ones: `yolov8m.pt` (players), `yolo11x-pose.pt` (pose) and
+  the Kokoro voice (`tts/kokoro-v1.0.int8.onnx`, `tts/voices-v1.0.bin`). The two YOLO models
+  also download by themselves on first use.
+- Three were trained for this project and are not downloadable: `ball_best.pt` (finds the
+  deliveries), `ball_ft.pt` (tracks the ball; optional) and `bat_best.pt` (bat contact). Get them
+  from the project's author; `ball_ft.pt` can be rebuilt with the labelling scripts (RUNBOOK §7).
+
+The match video is not included (broadcast footage): use your own recording, and set the teams
+in `configs/match.yaml`. `make doctor` then says whether everything is in place.
+
 Optional keys in `.env` (gitignored): `LIGHTNING_API_KEY` (commentary and shot reading through
 Lightning AI) or `GEMINI_API_KEY`; without one, commentary uses templates.
 

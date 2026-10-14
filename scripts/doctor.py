@@ -25,6 +25,9 @@ MODELS = {  # file: what needs it
     "models/tts/voices-v1.0.bin": "voice (local speech)",
 }
 OPTIONAL_MODELS = {"models/ball_ft.pt"}
+# Ultralytics downloads these by name on first use; `make models` fetches them (and Kokoro) now
+AUTO_DOWNLOAD = {"models/yolov8m.pt", "models/yolo11x-pose.pt"}
+DOWNLOADABLE = AUTO_DOWNLOAD | {"models/tts/kokoro-v1.0.int8.onnx", "models/tts/voices-v1.0.bin"}
 PACKAGES = ("cv2", "numpy", "torch", "ultralytics", "pytesseract", "pydantic", "yaml", "sqlalchemy", "fastapi", "kokoro_onnx")
 
 
@@ -61,7 +64,13 @@ def main() -> int:
             row(False, pkg, "pip install -r requirements.txt  (in the conda env 'ball')")
     print("models")
     for path, why in MODELS.items():
-        row((ROOT / path).is_file(), f"{path}  ({why})", "copy it into models/ (see README: Install)", path not in OPTIONAL_MODELS)
+        here = (ROOT / path).is_file()
+        if path in AUTO_DOWNLOAD and not here:
+            row(False, f"{path}  ({why}) - downloads by itself on first use", "or now: make models", required=False)
+        elif path in DOWNLOADABLE:
+            row(here, f"{path}  ({why})", "make models")
+        else:  # trained for this project: not downloadable
+            row(here, f"{path}  ({why})", "trained for this project - copy it into models/ (README: Install)", path not in OPTIONAL_MODELS)
     print("configs")
     for path in ("configs/match.yaml", "configs/scoreboard.yaml", "configs/scoreboard_digits.npz"):
         row((ROOT / path).is_file(), path, "see docs/RUNBOOK.md: a new match / a new broadcaster")

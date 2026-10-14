@@ -49,6 +49,9 @@ def audio_source(cfg: Config, video_id: str, video: Path) -> tuple[Path, float] 
             src = cfg.root / entry["source"]
             if src.is_file() and has_audio(src):
                 return src, float(entry["start_s"])
+            log.warning("no stadium sound: the clip is video-only and its source %s is not here (commentary only)", src)
+            return None
+    log.warning("no stadium sound: %s has no audio and configs/clips.yaml does not say where it was cut from", video.name)
     return None
 
 
