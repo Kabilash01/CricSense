@@ -161,3 +161,24 @@ def test_smoothing_removes_jitter_and_outliers():
 
     assert outliers >= 2 and smoothed[-1] is None
     assert err(smoothed[:40]) < err(noisy) / 3
+
+
+def test_within_a_shot_only_the_last_reference_is_matched(world, reference):
+    """Several references of one scene: a smooth move is followed on the last frame's reference,
+    one feature match per frame instead of one per reference (the 6x speed-up on Bumrah's over)."""
+    H1 = camera_homography(4, 2, 1.1)
+    second = (render_frame(world, H1), PitchHomography(true_image_to_pitch(H1)))
+    tracker = CameraTracker({"main": reference, "zoomed": second}, OPTS)
+    calls = 0
+    match = tracker._match
+
+    def counting(*args):
+        nonlocal calls
+        calls += 1
+        return match(*args)
+
+    tracker._match = counting
+    path = camera_path(25)  # ~1 s of a delivery's pan and zoom
+    for pan, tilt, zoom in path:
+        assert tracker.estimate(render_frame(world, camera_homography(pan, tilt, zoom))).view is not None
+    assert calls <= 1.2 * len(path)  # searching every reference: 2 per frame

@@ -182,10 +182,17 @@ and 40/40 score checks as before):
 - **Calibration references.** One reference frame per camera: the camera zooms hard during a
   delivery, so feature matching found only 206 of the clip's frames and missed the wicket ball.
   Each camera now keeps up to six strongly calibrated (>= 0.78) frames at least 10 s apart:
-  884 frames, 6/6 deliveries. Cost: every frame is matched against every reference (~2.3x the
-  matching time). Matching only the last-used reference was tried and dropped: a pitch
-  calibration is relative to the bowling direction, so the two ends' cameras get the same centre
-  and cannot be told apart by position; the tracker test of a cut between ends failed.
+  884 frames, 6/6 deliveries. Matching every frame against every reference cost 2,693 s on
+  this clip. Grouping references by camera position to skip some was tried and dropped: a pitch
+  calibration is relative to the bowling direction, so the two ends' cameras get the same centre;
+  the tracker test of a cut between ends failed. What is kept: within a shot a frame is matched
+  only against the reference the last frame used, and all references after a cut (thumbnail
+  grey-level change > 30; cuts measured 40-93, pans up to ~23), when the estimate jumps (corners
+  > 80 px from the last frame's) or when that reference's inliers fall below half the last
+  frame's (a cut between the ends' near-identical views: 453 -> 77). Bumrah's over 2,693 -> 446 s,
+  the same 884 frames, lengths within 9 cm; India's 6 minutes 621 -> 351 s, lengths identical;
+  `make check` all pass. Where the two differed most (zoomed frames, up to 62 px), the
+  followed reference sat closer to the painted crease.
 - **Score digits.** Tesseract read the score box's "11-1" as "1-1", "11", "111" or "-1" under
   every page mode and scaling tried, freezing the over at 7-1. The box's digits are now read glyph
   by glyph against templates of the font (`configs/scoreboard_digits.npz`, harvested by

@@ -36,6 +36,17 @@ _MAX_ZOOM = 3.0
 # constrain a homography, and in practice it is an unmasked on-screen graphic matching
 # itself at zero displacement (seen with the tournament logo on real footage).
 _MIN_INLIER_SPREAD = 0.05
+# Within one shot the camera cannot jump to another reference's scene, so a frame is matched
+# against the reference the last frame used; all references only after a cut or when that fails.
+# A cut: the mean grey-level change of a 192x108 thumbnail between consecutive frames (Bumrah's
+# over: cuts 40-93, normal motion and fast pans up to ~23).
+_CUT_DIFF = 30.0
+# ... and the frame must continue the last one: its corners land within this many pixels of
+# where the last frame's did (a wrong reference after an unseen cut makes the estimate jump).
+_CONTINUITY_PX = 80.0
+# ... and keep most of its matches: a cut between the two ends' near-identical views changes
+# the picture little (thumbnail 6.6) but the last reference's inliers collapse (453 -> 77).
+_KEEP_INLIERS = 0.5
 
 
 @dataclass(frozen=True)
@@ -71,9 +82,27 @@ class CameraTracker:
         # (features, view, frame -> reference homography) of the last tracked frame
         self._prev: tuple[_Features, str, np.ndarray] | None = None
         self._chain_len = 0  # consecutive frames tracked only via the previous frame
+        self._thumb: np.ndarray | None = None
+        self._last_inliers = 0  # the last frame's inliers against its reference
 
     def estimate(self, image: np.ndarray) -> CameraEstimate:
         feats = self._features(image)
+        thumb = cv2.cvtColor(cv2.resize(image, (192, 108), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY).astype(np.float32)
+        cut = self._thumb is None or float(np.abs(thumb - self._thumb).mean()) > _CUT_DIFF
+        self._thumb = thumb
+
+        if self._prev is not None and not cut and len(self._refs) > 1:
+            _, view, prev_to_ref = self._prev
+            found = self._match(feats, self._refs[view][0])
+            if (
+                found is not None
+                and found[1] >= max(self._opts.min_inliers, _KEEP_INLIERS * self._last_inliers)
+                and _continuous(found[0], prev_to_ref, image.shape)
+            ):
+                estimate = self._finish(feats, view, found[0], found[1], chained=False)
+                if estimate.view is not None:
+                    self._last_inliers = found[1]
+                    return estimate
 
         best: tuple[str, np.ndarray, int] | None = None
         for name, (ref_feats, _) in self._refs.items():
@@ -83,6 +112,7 @@ class CameraTracker:
         if best is not None and best[2] >= self._opts.min_inliers:
             estimate = self._finish(feats, best[0], best[1], best[2], chained=False)
             if estimate.view is not None:
+                self._last_inliers = best[2]
                 return estimate
 
         if self._prev is not None and self._chain_len < self._opts.max_chain_frames:
@@ -99,6 +129,7 @@ class CameraTracker:
         """Forget the last tracked frame (a cut away from the calibrated view)."""
         self._prev = None
         self._chain_len = 0
+        self._thumb = None
 
     def _finish(
         self, feats: _Features, view: str, frame_to_ref: np.ndarray, inliers: int, *, chained: bool
@@ -161,6 +192,16 @@ class CameraTracker:
 # Pitch points whose image positions stand in for a frame's homography while smoothing.
 _ANCHORS = np.array([[1.22, -1.32], [1.22, 1.32], [18.9, -1.32], [18.9, 1.32]])
 _MIN_SEGMENT = 5  # shorter runs of calibrated frames are left as they are
+
+
+def _continuous(frame_to_ref: np.ndarray, prev_to_ref: np.ndarray, shape: tuple[int, ...]) -> bool:
+    """Do this frame's corners land in the reference within _CONTINUITY_PX of the last frame's?"""
+    h, w = shape[:2]
+    corners = np.array([[0, 0, 1], [w, 0, 1], [0, h, 1], [w, h, 1]], dtype=np.float64).T
+    a, b = frame_to_ref @ corners, prev_to_ref @ corners
+    if np.any(np.abs(a[2]) < 1e-9) or np.any(np.abs(b[2]) < 1e-9):
+        return False
+    return float(np.max(np.linalg.norm(a[:2] / a[2] - b[:2] / b[2], axis=0))) <= _CONTINUITY_PX
 
 
 def smooth_homographies(
