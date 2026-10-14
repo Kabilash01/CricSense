@@ -89,6 +89,10 @@ def run_commentary(cfg: Config, video_id: str, engine: str | None = None, vlm: b
                 except Exception as e:  # the VLM is an extra; commentary goes on without it
                     log.warning("VLM failed for delivery %d: %s", f.delivery_id, e)
                     shot = None
+                if shot and f.wicket:
+                    # nothing measured says how the batter got out; a shot beside "out" reads as the
+                    # mode ("Hendricks flicks it leg side, out!" - he was bowled)
+                    shot = None
                 if shot and f.swing == "left":
                     shot = None  # the measured swing says the ball was left alone
                 if shot and f.footwork in ("front foot", "back foot"):

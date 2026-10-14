@@ -100,3 +100,10 @@ def test_a_shot_is_reported_only_when_readings_agree(tmp_path, monkeypatch):
     assert got["shot"] == "slog sweep" and got["votes"] == "2/3"
     replies = iter([seen, drive, {**drive, "ball_side": "straight"}])
     assert vlm.read_shot(LLMConfig("openai", "m"), "k", [b"other"], Cache(tmp_path / "d.json")) is None  # no two agree
+
+
+def test_fact_check_rejects_how_a_batter_got_out():
+    out = replace(SIX, runs=0, off_bat=0, boundary=None, wicket=True).as_dict()
+    assert check_line("Axar is out! What a moment.", out, SQUAD, 30) is None
+    for line in ("Axar is bowled! Through the gate!", "Caught! Axar has to go.", "Axar edges it and he's out!", "Plumb lbw, Axar is out!"):
+        assert "how the batter was out" in check_line(line, out, SQUAD, 30), line

@@ -110,7 +110,9 @@ position, and more wides to test on (5 per innings; several matches).
 `scripts/wide_eval.py --cameras-from <a calibrated clip of the match>` runs the vision passes
 on each clip with no clicks. Current: calibrated 14/20 with no wrong pitch (precision first:
 a wrong calibration silently corrupts everything after it; a missing one is visible); delivery
-found on 10 of the 14.
+found on 11 of the 14 (re-run 2026-10-14 after the multi-reference
+calibration: the same 14 clips calibrate, all checked by eye on the painted creases; one more
+delivery found, we_wide_19_1).
 - The 6 calibration misses: a clip with one pitch frame, a dugout/advert clip with none, and
   views where only one frame is strong (a second agreeing frame or a known camera is needed).
 - The 4 delivery misses: no ball detection near the release - the candidates there sit at

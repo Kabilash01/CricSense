@@ -59,7 +59,7 @@ skipping frames with no pitch in view.
 | Against a hand-clicked frame | 7 of 8 crease corners within 3.3 px |
 | Where the hand calibration had drifted (bowler's end) | the automatic one sits on the paint |
 | Second innings (never calibrated by hand) | calibrated, creases on the paint on all 5 deliveries |
-| 20 new clips | 14 calibrated, none wrongly (precision first: a wrong calibration corrupts everything after it) |
+| 20 new clips | 14 calibrated, none wrongly (precision first: a wrong calibration corrupts everything after it); re-run after the multi-reference change: the same 14, camera tracking 9-65 s per clip |
 | A 3D camera per frame (fixed centre, zoom and rotation fitted) | heights to ~2-3% |
 
 ### 3.2 Players
@@ -195,7 +195,7 @@ Each measured before being dropped ([decisions.md](decisions.md)):
 
 - Generalising to other broadcasts needs a score-bar layout per graphics package and may need a
   short labelling round for the ball detector; calibration and the rest are automatic.
-- Deliveries are missed when the ball is not detected near the release (4 of 14 calibrated
+- Deliveries are missed when the ball is not detected near the release (3 of 14 calibrated
   benchmark clips): more labelled frames of the early flight would help most.
 - Shot type is an AI reading, not a measurement; a labelled answer key would let it be scored.
 - Live length and line need a free GPU or faster inference (FP16/TensorRT, a crop on the pitch).

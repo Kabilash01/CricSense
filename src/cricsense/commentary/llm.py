@@ -37,6 +37,8 @@ Rules - they are checked, and a line that breaks one is thrown away:
 - If runs is null, the outcome is unknown: describe the delivery only.
 - Name only the bowler, striker, non_striker or batting_team given for that ball.
 - Say "SIX" / "FOUR" only if boundary says so; "out" only if wicket is true.
+- A wicket's facts do not say HOW the batter was out: never say or imply bowled, caught, lbw,
+  stumped, run out, an edge or a shot that got them out - only that the batter is out.
 - footwork (front foot / back foot / in the crease) and swing (played / left) are measured; use them freely.
 - shot/direction may be given (from video analysis); use them only if present, as given
   (e.g. "slog sweep", "leg side") - never name a shot or a fielding position that is not there.
@@ -158,6 +160,13 @@ def _numbers_in_facts(facts: dict) -> set[float]:
     return nums
 
 
+# how a batter got out: never measured, so never said
+_DISMISSAL_MODE = (
+    r"\b(clean bowled|bowled (him|over)|bowls him|through the gate|stumps|timber|caught|catch|lbw|"
+    r"leg before|stumped|run out|edges?|edged|nicks?|nicked|holes out|plumb|castled)\b"
+)
+
+
 def check_line(text: str, facts: dict, squad: set[str], max_words: int) -> str | None:
     """None if the line is faithful to the facts, else the reason it is not."""
     words = text.split()
@@ -181,6 +190,8 @@ def check_line(text: str, facts: dict, squad: set[str], max_words: int) -> str |
         return "calls a boundary the facts do not have"
     if not facts.get("wicket") and re.search(r"\b(wicket|bowled him|caught|lbw|stumped|run out)\b|\bout!|\b(is|he's|that's|and he's) out\b", lowered):
         return "calls a wicket the facts do not have"
+    if facts.get("wicket") and re.search(_DISMISSAL_MODE, lowered):
+        return "says how the batter was out; the facts do not"
     return None
 
 
