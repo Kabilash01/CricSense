@@ -196,3 +196,23 @@ and 40/40 score checks as before):
   delivery before the reading appears, not the last tracked shot (it had moved 142.4 km/h to
   the false one). An aborted run-up (no ball recorded by the bar) still shows as a delivery with
   no outcome ("no evidence").
+
+## Score-box font templates over the whole match
+
+A full rescan (46 min) with the glyph reader, measured by `scripts/coverage.py`:
+
+| | India | South Africa |
+|---|---|---|
+| before (Tesseract) | 118/121 ball counts, 114 single-ball steps | 115/121, 106 steps |
+| first version | 118, 108 | **95**, 81 - rejected |
+| fixed | 118, 114 | **117, 111** |
+
+Final scores exact throughout (176-7, 169-8). The first version applied the box's score to the
+layout's reading wherever the box was found; on a moved bar (the chase's compact bar) the
+layout's overs field reads the wrong place, so a right score came with wrong overs and the
+plausibility rules dropped those states (score-box readings 3,466 -> 425). The box's score now
+replaces the layout's only when the box sits within 25 px of where the layout expects it (normal
+centres 3-15 px off); a moved bar goes the score-box way, with the overs read beside the box
+(test: the bar shifted -150 to +100 px). The rescan also found the score box on frames the old
+reader missed, where the overs beside it picked up a stray digit ("3 2.40" for 2.4 overs): an
+overs.balls number now wins over a bare one. `make check`: all three verified clips unchanged.

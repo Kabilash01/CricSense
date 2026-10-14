@@ -93,7 +93,7 @@ make coverage    # ball counts seen per innings, and the final scores read
 ```
 
 Compare the final scores with the official scorecard - they must match exactly (this final:
-India 176-7, South Africa 169-8). Ball counts seen: 118/121 and 115/121 at present. To scan a
+India 176-7, South Africa 169-8). Ball counts seen: 118/121 and 117/121 at present. To scan a
 part only: `python -m cricsense scoreboard --video "<match>" --start 6500 --end 12800 --out-name sa.json`.
 
 ---

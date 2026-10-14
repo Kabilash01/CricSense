@@ -121,7 +121,7 @@ score, strike, extras and figures by the laws and is checked against the bar aft
 |---|---|
 | Outcomes on the three test clips | 21/21 (incl. a six, two fours, a wicket, an extra) |
 | Score engine checks | 88/88, 40/40 and 54/54 |
-| Whole match | both innings' final scores exact (176-7, 169-8); ball counts seen: India 118/121, South Africa 115/121 (90 before the score-box reader; single-ball steps 76 -> 106) |
+| Whole match | both innings' final scores exact (176-7, 169-8); ball counts seen: India 118/121, South Africa 117/121 (90 before the score-box reader, 115 before the font templates; single-ball steps 76 -> 106 -> 111) |
 
 The score and overs checks are consistency checks (the outcomes come from the same bar); strike
 rotation, balls faced and bowler figures are independently tested.

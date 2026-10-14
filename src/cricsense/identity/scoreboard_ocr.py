@@ -27,6 +27,7 @@ Rect = tuple[int, int, int, int]
 
 _NAME_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
 _NUMBER_CHARS = "0123456789-."
+_BOX_AT_LAYOUT_PX = 25  # score box centre this close to the layout's score rectangle centre: bar not moved
 _MIN_SPEED_KPH, _MAX_SPEED_KPH = 50.0, 170.0  # anything outside is a misread, not a delivery
 
 
@@ -82,8 +83,10 @@ def parse_score(text: str) -> tuple[int | None, int | None]:
 
 
 def parse_overs(text: str) -> int | None:
-    """'11.1 OVERS' -> 67 legal balls; '11 OVERS' -> 66. A ball digit above 5 is a misread."""
-    m = re.search(r"(\d{1,2})(?:\s*\.\s*(\d))?", text)
+    """'11.1 OVERS' -> 67 legal balls; '11 OVERS' -> 66. A ball digit above 5 is a misread.
+    An overs.balls number wins over a bare one: beside a moved score box the OCR picks up a stray
+    digit first ("3 2.40" for 2.4 overs), which as 3 overs blocked the next balls' states."""
+    m = re.search(r"(\d{1,2})\s*\.\s*(\d)", text) or re.search(r"(\d{1,2})()", text)
     if not m:
         return None
     balls = int(m.group(2) or 0)
@@ -165,9 +168,13 @@ class ScoreboardReader:
         score cannot go backwards or faster than the game. With the font's digit templates the
         box's score replaces the layout's (Tesseract drops 1s: "11-1" read as "1-1")."""
         reading = self._read_fields(image, frame_id, t) if self.is_visible(image) else None
+        found = None
         if reading is not None and self.digit_reader is not None:
             found = self._find_score_box(image)
-            if found is not None:
+            # only where the layout expects the score: a box elsewhere means the bar has moved, and
+            # the layout's other fields (overs) then read the wrong place - the score-box path below
+            # (taking the box's score with a layout's overs dropped the chase's ball counts 115 -> 95)
+            if found is not None and self._at_layout_score(image, found[2]):
                 runs, wickets, _ = found
                 raw = {**reading.raw, "score_box": f"{runs}-{wickets}"}
                 reading = reading.model_copy(update={"runs": runs, "wickets": _within(wickets, 0, 10), "raw": raw})
@@ -175,7 +182,8 @@ class ScoreboardReader:
             return reading
         if reading is None and not self._bar_present(image):
             return None  # an advert, a replay, a close-up: no bar to look for
-        found = self._find_score_box(image)
+        if found is None:
+            found = self._find_score_box(image)
         if found is None:
             return reading
         runs, wickets, (bx, by, bw, bh) = found
@@ -192,6 +200,15 @@ class ScoreboardReader:
             "legal_balls": parse_overs(overs),
             "raw": {**base.raw, "variant": "score box", "score": f"{runs}-{wickets}", "overs": overs},
         })
+
+    def _at_layout_score(self, image: np.ndarray, box: tuple[int, int, int, int]) -> bool:
+        """Is the score box where the layout expects it? Its centre sits 3-15 px left of the score
+        rectangle's centre (the box is as wide as its digits); a bar moved 60 px still has the box
+        inside the rectangle but the overs field off its digits, so the rectangle is too loose."""
+        x0, y0, x1, y1 = self._scaled(image, self.layout.fields["score"])
+        bx, by, bw, bh = box
+        tol = _BOX_AT_LAYOUT_PX * image.shape[0] / self.layout.reference_size[1]
+        return abs(bx + bw / 2 - (x0 + x1) / 2) <= tol and abs(by + bh / 2 - (y0 + y1) / 2) <= tol
 
     def _bar_present(self, image: np.ndarray) -> bool:
         """The bar's white panels across its band: 0.15-0.31 on every bar variant seen, ~0 on

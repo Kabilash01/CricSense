@@ -38,7 +38,7 @@ def test_parse_score(text, expected):
 
 
 @pytest.mark.parametrize(
-    "text, balls", [("11.1 OVERS", 67), ("11 OVERS", 66), ("3 oVERS", 18), ("1.1", 7), ("11.7", None), ("", None)]
+    "text, balls", [("11.1 OVERS", 67), ("11 OVERS", 66), ("3 oVERS", 18), ("1.1", 7), ("11.7", None), ("", None), ("3 2.40", 16), ("5 4.3", 27)]
 )
 def test_parse_overs(text, balls):
     assert parse_overs(text) == balls
@@ -142,3 +142,14 @@ def test_glyphs_split_digits_and_dash():
     box = cv2.imread(str(FIXTURES / "scorebar_eleven_one.png"))[15:65, 895:1035]
     kinds = ["-" if isinstance(g, str) else "d" for g in glyphs(white_mask(box))]
     assert kinds == ["d", "d", "-", "d"]
+
+
+@needs_tesseract
+@pytest.mark.parametrize("shift", [-150, -60, 60, 100])
+def test_a_moved_bar_keeps_score_and_overs_together(shift):
+    """The bar shifted sideways: the layout's overs field reads the wrong place, so the score box's
+    score must come with the overs beside the box, not the layout's (115 -> 95 chase balls)."""
+    frame = frame_with("scorebar_eleven_one.png")
+    frame[930:1030] = np.roll(frame[930:1030], shift, axis=1)
+    r = ScoreboardReader(LAYOUT).read(frame, frame_id=0, t=0.0)
+    assert (r.runs, r.wickets, r.legal_balls) == (11, 1, 10)
