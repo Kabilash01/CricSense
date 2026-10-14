@@ -1,0 +1,31 @@
+# The demo video (scripts/make_demo.py): title cards and clips' overlays, in order.
+# A card is a list of lines: [text, size, bold, colour]; colour is white, grey or pink.
+# A clip is an output folder whose overlay.mp4 exists (cricsense run --video data/<clip>.mp4 --voice).
+out: outputs/demo/cricsense_demo.mp4
+card_seconds: 4
+sections:
+  - card:
+      - ["CricSense", 72, true, white]
+      - ["Ball-by-ball analysis of a TV cricket broadcast, automatically", 30, false, grey]
+      - ["ICC Men's T20 World Cup 2024 final  -  India v South Africa", 28, false, grey]
+  - card:
+      - ["India's innings", 56, true, white]
+      - ["overs 11.1 - 12.4:  Shamsi and Nortje to Kohli and Axar", 30, false, grey]
+      - ["players, ball path, bounce, length and line, speed, outcomes, AI commentary", 26, false, grey]
+  - clip: final_0051_6min
+  - card:
+      - ["South Africa's innings: spin", 56, true, white]
+      - ["overs 7.1 - 7.5:  Kuldeep to Stubbs and de Kock", 30, false, grey]
+      - ["never seen while the system was built: calibrated with no clicks", 26, false, pink]
+  - clip: st_022000
+  - card:
+      - ["South Africa's innings: pace", 56, true, white]
+      - ["over 2:  Bumrah to de Kock, Hendricks and Markram  -  137-142 km/h", 30, false, grey]
+      - ["never seen while the system was built: a wicket and a four", 26, false, pink]
+  - clip: st_bumrah_o2
+  - card:
+      - ["Measured", 52, true, white]
+      - ["three clips, spin and pace:  deliveries 21/21, outcomes 21/21", 30, false, grey]
+      - ["speed: broadcaster's radar on 17 of 21; our estimate within 6% (median)", 30, false, grey]
+      - ["score engine 182/182 checks; both innings' final scores read exactly", 30, false, grey]
+      - ["details and limits: docs/REPORT.md", 26, false, pink]

@@ -51,6 +51,18 @@ Models go in `models/` (not in git): `ball_best.pt`, `ball_ft.pt`, `bat_best.pt`
 Optional keys in `.env` (gitignored): `LIGHTNING_API_KEY` (commentary and shot reading through
 Lightning AI) or `GEMINI_API_KEY`; without one, commentary uses templates.
 
+## Run it yourself
+
+Every task is one command - `make help` lists them, and [docs/RUNBOOK.md](docs/RUNBOOK.md)
+says for each how long it takes, how to tell if it worked and what to do when it did not:
+
+```bash
+make doctor                                   # is this machine ready?
+make clip START=6840 END=7160 CLIP=my_over    # cut a piece of the match
+make run CLIP=my_over                         # everything on it, with spoken commentary
+make check                                    # did a change break anything? (PASS/FAIL, ball by ball)
+```
+
 ## Run
 
 ```bash

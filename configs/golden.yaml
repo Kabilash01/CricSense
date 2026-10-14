@@ -1,0 +1,124 @@
+# Expected answers for scripts/check.py - verified by hand against the broadcast.
+final_0051_6min:
+  deliveries: 10
+  balls:
+  - over: '11.1'
+    score: 82-3
+    striker: KOHLI
+    bowler: SHAMSI
+    radar_kph: 81.4
+  - over: '11.2'
+    score: 83-3
+    striker: AXAR
+    bowler: SHAMSI
+    radar_kph: 82.9
+  - over: '11.3'
+    score: 84-3
+    striker: KOHLI
+    bowler: SHAMSI
+    radar_kph: null
+  - over: '11.4'
+    score: 85-3
+    striker: AXAR
+    bowler: SHAMSI
+    radar_kph: null
+  - over: '11.5'
+    score: 91-3
+    striker: AXAR
+    bowler: SHAMSI
+    radar_kph: 89.2
+  - over: '12.0'
+    score: 93-3
+    striker: KOHLI
+    bowler: SHAMSI
+    radar_kph: null
+  - over: '12.1'
+    score: 94-3
+    striker: AXAR
+    bowler: NORTJE
+    radar_kph: 145.9
+  - over: '12.2'
+    score: 95-3
+    striker: KOHLI
+    bowler: NORTJE
+    radar_kph: null
+  - over: '12.3'
+    score: 95-3
+    striker: KOHLI
+    bowler: NORTJE
+    radar_kph: 139.5
+  - over: '12.4'
+    score: 96-3
+    striker: AXAR
+    bowler: NORTJE
+    radar_kph: 128.4
+  checks:
+  - 88
+  - 88
+st_022000:
+  deliveries: 5
+  balls:
+  - over: '7.1'
+    score: 53-2
+    striker: STUBBS
+    bowler: KULDEEP
+    radar_kph: 86.0
+  - over: '7.2'
+    score: 54-2
+    striker: DE KOCK
+    bowler: KULDEEP
+    radar_kph: 88.1
+  - over: '7.3'
+    score: 55-2
+    striker: STUBBS
+    bowler: KULDEEP
+    radar_kph: 84.3
+  - over: '7.4'
+    score: 56-2
+    striker: DE KOCK
+    bowler: KULDEEP
+    radar_kph: 84.7
+  - over: '7.5'
+    score: 56-2
+    striker: DE KOCK
+    bowler: KULDEEP
+    radar_kph: 84.9
+  checks:
+  - 40
+  - 40
+st_bumrah_o2:
+  deliveries: 7
+  balls:
+  - over: '1.1'
+    score: 6-0
+    striker: DE KOCK
+    bowler: BUMRAH
+    radar_kph: 139.3
+  - over: '1.2'
+    score: 7-0
+    striker: HENDRICKS
+    bowler: BUMRAH
+    radar_kph: 142.4
+  - over: '1.3'
+    score: 7-1
+    striker: MARKRAM
+    bowler: BUMRAH
+    radar_kph: 140.5
+  - over: '1.4'
+    score: 11-1
+    striker: MARKRAM
+    bowler: BUMRAH
+    radar_kph: 137.6
+  - over: '1.5'
+    score: 11-1
+    striker: MARKRAM
+    bowler: BUMRAH
+    radar_kph: 139.1
+  - over: '2.0'
+    score: 11-1
+    striker: DE KOCK
+    bowler: BUMRAH
+    radar_kph: 137.0
+  checks:
+  - 54
+  - 54
