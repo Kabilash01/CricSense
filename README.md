@@ -28,7 +28,7 @@ what did not work is recorded with its measurements in [docs/decisions.md](docs/
 | **Voice** | Local Kokoro TTS, mixed over the stadium sound | ~0.4 GB memory, no API key |
 | **Overlay** | Ball path held on the pitch through camera moves, bounce, delivery card, pitch map, wagon wheel, captions | |
 | **Storage / API** | PostgreSQL + object storage; FastAPI: upload a video, read deliveries, events, scorecard, commentary, files | |
-| **Live** | Score, outcomes, boundaries, wickets and radar on a stream in real time | 5/5 balls, median 1.8 s after the bar settled |
+| **Live** | Score, outcomes, boundaries, wickets and radar on a stream in real time | 5/5 balls, median 1.0 s after the bar settled; never more than 0.16 s behind real time |
 
 Not done, because the broadcast does not show it well enough (measurements in
 [docs/decisions.md](docs/decisions.md)): runs counted from the batters running, wides by ball

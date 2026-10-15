@@ -223,3 +223,14 @@ centres 3-15 px off); a moved bar goes the score-box way, with the overs read be
 (test: the bar shifted -150 to +100 px). The rescan also found the score box on frames the old
 reader missed, where the overs beside it picked up a stray digit ("3 2.40" for 2.4 overs): an
 overs.balls number now wins over a bare one. `make check`: all three verified clips unchanged.
+
+## Live mode re-measured (2026-10-15, GPU nearly free)
+
+Same test (the 6-minute clip's first 150 s): 5/5 balls right, median 0.99 s after the bar settled
+(was 1.8 s), radar 0.1 s. The report's wall time had included waiting at the end for shots
+still being processed (215 s for 150 s of video), and its "late frames" were the ~8 s of model
+loading counted against the first frames. The report now gives when playback ended
+(`play_wall_seconds`: 150.0) and the worst lag (`reader_max_lag_s`: 0.16 s once the clock
+starts after the models are loaded; it was 8.4 s at t = 0). Length and line: 4 shots, 1 bounce,
+right (4.82 m vs 4.79 m offline) but 146 s late; 3 without a bounce. Still not live: per shot,
+camera re-tracking and both ball models over the buffered frames take minutes.

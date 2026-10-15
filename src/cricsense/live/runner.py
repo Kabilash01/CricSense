@@ -402,18 +402,20 @@ def run_live(
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     state = LiveState()
-    start = time.perf_counter()
     buffer: deque = deque(maxlen=int(BUFFER_S * fps))  # the last seconds of frames, for a shot's delivery
-    score = ScoreWorker(cfg, state, start)
-    vb = ViewBallWorker(cfg, state, start, calibration_yaml, fps, cfg.device, buffer)
+    score = ScoreWorker(cfg, state, 0.0)
+    vb = ViewBallWorker(cfg, state, 0.0, calibration_yaml, fps, cfg.device, buffer)
     workers = [score, vb]
+    # the clock starts once the models are loaded (~8 s): before that nothing is live yet
+    start = time.perf_counter()
     for wk in workers:
+        wk.t0 = start
         wk.start()
     writer = None
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-    frame_id, drawn, late = 0, 0, 0
+    frame_id, drawn, late, max_lag, max_lag_t = 0, 0, 0, 0.0, 0.0
     score_every = max(1, int(round(fps / 2)))
     while True:
         ok, image = cap.read()
@@ -428,6 +430,8 @@ def run_live(
                 time.sleep(wait)
             elif wait < -0.2:
                 late += 1
+            if -wait > max_lag:
+                max_lag, max_lag_t = -wait, t
         buffer.append((frame_id, t, image))
         if frame_id % score_every == 0:
             score.offer((frame_id, t, image))
@@ -439,6 +443,7 @@ def run_live(
             writer.write(draw(image.copy(), state, wall, t, stats))
             drawn += 1
         frame_id += 1
+    play_wall = time.perf_counter() - start  # the source has been played; shots may still be processing
     for wk in workers:
         wk.inbox.put(None)
     for wk in workers:
@@ -452,6 +457,7 @@ def run_live(
         by_kind.setdefault(ev.kind, []).append(ev.latency_s)
     report = {
         "source": source, "frames": frame_id, "source_seconds": round(frame_id / fps, 1), "wall_seconds": round(wall, 1),
+        "play_wall_seconds": round(play_wall, 1), "reader_max_lag_s": round(max_lag, 2), "reader_max_lag_at_s": round(max_lag_t, 1),
         "realtime": realtime, "frames_drawn": drawn, "reader_late_frames": late,
         "workers": {wk.name: {"processed": wk.processed, "dropped": wk.dropped, "busy_s": round(wk.busy_s, 1),
                               "rate_per_s": round(wk.processed / max(wall, 1e-6), 2), **getattr(wk, "counts", {})} for wk in workers},

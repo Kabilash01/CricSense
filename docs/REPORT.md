@@ -154,10 +154,11 @@ commentary, download the overlay and images.
 ### 3.9 Live mode
 
 A reader plays the source at its pace; workers take only the frames they can keep up with. On
-150 s played in real time (151.5 s wall): each ball's outcome, boundaries, wickets and the radar
-speed live - 5/5 balls right, median 1.8 s after the bar settled. Length and line are found per
-shot from a frame buffer in a background thread, but beside another job on the GPU a shot takes
-over a minute: not claimed as live.
+150 s played in 150.0 s, never more than 0.16 s behind (the clock starts once the models are
+loaded): each ball's outcome, boundaries, wickets and the radar speed live - 5/5 balls right,
+median 1.0 s after the bar settled, radar 0.1 s. Length and line are found per shot from a frame
+buffer in a background thread; the one bounce found was right (4.82 m; offline 4.79 m) but came
+146 s late, with the GPU nearly free, and 3 of 4 shots gave none: not claimed as live.
 
 ## 4. Speed
 
