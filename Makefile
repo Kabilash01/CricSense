@@ -18,7 +18,9 @@ help:  ## list the commands
 doctor:  ## is this machine ready? (programs, packages, models, GPU, keys)
 	$(PY) scripts/doctor.py
 
-models:  ## download the public models (YOLO, pose, Kokoro voice; ~300 MB); custom ones: README
+models:  ## download every model (~480 MB): this project's from its GitHub release, YOLO, pose, Kokoro voice
+	mkdir -p models
+	cd models && gh release download models-v1 --repo Kabilash01/CricSense --skip-existing && sha256sum -c SHA256SUMS
 	$(PY) -c "from ultralytics import YOLO; [YOLO(m) for m in ('models/yolov8m.pt', 'models/yolo11x-pose.pt')]"
 	mkdir -p models/tts
 	cd models/tts && for f in kokoro-v1.0.int8.onnx voices-v1.0.bin; do test -f $$f || curl -fL -o $$f https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$$f; done

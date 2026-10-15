@@ -47,12 +47,14 @@ sudo pacman -S tesseract ffmpeg postgresql   # or your distribution's packages
 
 Models go in `models/` (not in git):
 
-- `make models` downloads the public ones: `yolov8m.pt` (players), `yolo11x-pose.pt` (pose) and
-  the Kokoro voice (`tts/kokoro-v1.0.int8.onnx`, `tts/voices-v1.0.bin`). The two YOLO models
-  also download by themselves on first use.
-- Three were trained for this project and are not downloadable: `ball_best.pt` (finds the
-  deliveries), `ball_ft.pt` (tracks the ball; optional) and `bat_best.pt` (bat contact). Get them
-  from the project's author; `ball_ft.pt` can be rebuilt with the labelling scripts (RUNBOOK §7).
+`make models` downloads all of them (~480 MB) and checks them:
+
+- the three trained for this project - `ball_best.pt` (finds the deliveries), `ball_ft.pt`
+  (tracks the ball) and `bat_best.pt` (bat contact) - from the repository's
+  [models-v1 release](https://github.com/Kabilash01/CricSense/releases/tag/models-v1). The
+  repository is private: you need access to it and the GitHub CLI logged in (`gh auth login`);
+- `yolov8m.pt` (players) and `yolo11x-pose.pt` (pose), which also download by themselves on
+  first use, and the Kokoro voice (`tts/kokoro-v1.0.int8.onnx`, `tts/voices-v1.0.bin`).
 
 The match video is not included (broadcast footage): use your own recording, and set the teams
 in `configs/match.yaml`. `make doctor` then says whether everything is in place.
