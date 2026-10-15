@@ -35,3 +35,6 @@ CLAUDE.local.md
 
 # benchmark clips (scripts/wide_eval.py): calibrations are regenerated automatically
 configs/calibration/we_*.yaml
+
+# Voice recordings for F5-TTS: personal data, never committed
+voices/

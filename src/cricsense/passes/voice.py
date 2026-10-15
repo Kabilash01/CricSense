@@ -25,7 +25,7 @@ def run_voice(cfg: Config, video_id: str) -> tuple[Path, list[dict], list[str]]:
     out_dir = cfg.output_dir_for(video_id)
     doc = read_doc(out_dir / "commentary.json", CommentaryDoc)
     raw = (cfg.commentary.get("tts") or {})
-    tcfg = TTSConfig(**{k: raw[k] for k in ("engine", "model", "voices", "voice") if k in raw})
+    tcfg = TTSConfig(**{k: raw[k] for k in ("engine", "model", "voices", "voice", "ref_audio", "ref_text") if k in raw})
     key = api_key(LLMConfig("gemini", tcfg.model, key_env=raw.get("key_env")), cfg.root) if tcfg.engine == "gemini" else None
     cache = ClipCache(out_dir / "tts")
     clips, texts, problems = [], [], []

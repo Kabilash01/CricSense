@@ -26,3 +26,6 @@ tts:                    # spoken commentary (cricsense voice)
   voices: models/tts/voices-v1.0.bin
   voice: bm_george      # a British male voice; others: bm_lewis, bm_daniel, am_michael
   # gemini: engine gemini, model gemini-3.8-flash-tts, voice Sadaltager
+  # f5 (a cloned voice - only someone who agreed): engine f5, plus
+  #   ref_audio: voices/<name>.wav     # 8-15 s of clean speech; voices/ is not committed
+  #   ref_text: "exactly the words said in that recording"

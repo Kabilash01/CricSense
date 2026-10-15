@@ -25,6 +25,7 @@ render = ["matplotlib>=3.8", "pillow>=10"]
 commentary = ["requests>=2.31"]
 voice = ["kokoro-onnx>=0.6", "soundfile>=0.12"]
 store = ["sqlalchemy>=2.0", "psycopg[binary]>=3.1"]
+clone-voice = ["f5-tts>=1.1"]  # tts.engine f5; installs torchaudio 2.11 beside torch 2.14 (works; see RUNBOOK)
 s3 = ["boto3>=1.34"]  # only for object storage on S3 (configs/store.yaml); local files need nothing
 roboflow = ["roboflow>=1.1"]  # only for prepare_ball_labelling.py --upload; the local labeller needs nothing
 api = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9"]

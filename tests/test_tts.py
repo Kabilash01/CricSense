@@ -26,3 +26,15 @@ def test_big_moments_get_an_excited_delivery():
     assert "excited" in style_for("ball", "SIX! Axar launches it.")
     assert "calm" in style_for("after", "India 91 for 3.")
     assert "brisk" in style_for("ball", "Kohli works it away for one.")
+
+
+def test_f5_says_what_it_needs():
+    """The cloned-voice engine needs a recording and its exact words; without them it says so."""
+    import pytest
+
+    from cricsense.commentary.tts import STYLES, TTSConfig, synthesize
+
+    with pytest.raises(RuntimeError, match="ref_audio"):
+        synthesize(TTSConfig(engine="f5", ref_audio="voices/missing.wav", ref_text="hello"), None, "Four!", STYLES["big"])
+    with pytest.raises(RuntimeError, match="ref_text"):
+        synthesize(TTSConfig(engine="f5", ref_audio="README.md", ref_text=""), None, "Four!", STYLES["big"])

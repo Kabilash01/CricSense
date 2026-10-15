@@ -4,7 +4,11 @@ Two engines:
   kokoro  local, free, no key: the Kokoro 82M model, int8 ONNX (~90 MB, ~0.4 GB of memory,
           CPU at ~0.5x real time); delivery is set by pace (it takes no style prompt);
   gemini  Gemini TTS over its REST Interactions endpoint (free tier, needs GEMINI_API_KEY);
-          delivery is set by a style prompt.
+          delivery is set by a style prompt;
+  f5      F5-TTS, local (GPU if free): speaks in the voice of a short reference recording
+          (ref_audio, with its exact words in ref_text). Only a voice whose owner agreed - never a
+          real person's voice without their consent. Weights (~1.3 GB, CC-BY-NC) download into
+          models/tts/f5 on first use.
 Each line gets a delivery to match it - brisk as the ball is played, excited for a boundary
 or a wicket, calm for the score - and is cached as a WAV file, so a re-run synthesises nothing. The track is the length of the clip with each line
 placed at its time; a line that runs past the next one pushes it later, never overlaps it.
@@ -35,15 +39,35 @@ STYLES = {
 
 @dataclass(frozen=True)
 class TTSConfig:
-    engine: str = "kokoro"  # kokoro | gemini
+    engine: str = "kokoro"  # kokoro | gemini | f5
     model: str = "models/tts/kokoro-v1.0.int8.onnx"  # kokoro: the ONNX file; gemini: the model id
     voices: str = "models/tts/voices-v1.0.bin"  # kokoro only
     voice: str = "bm_george"  # kokoro: a British male voice; gemini e.g. "Sadaltager"
     timeout_s: float = 60.0
+    ref_audio: str = ""  # f5: the reference recording (relative to the repo root)
+    ref_text: str = ""  # f5: exactly what is said in it
 
 
 PACE = {"ball": 1.1, "big": 1.2, "after": 1.0}  # kokoro: speaking rate per kind of line
 _KOKORO = {}
+_F5 = {}
+
+
+def _f5(root):
+    if "model" not in _F5:
+        import torch
+        from f5_tts.api import F5TTS
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        _F5["model"] = F5TTS(device=device, hf_cache_dir=str(root / "models" / "tts" / "f5"))
+    return _F5["model"]
+
+
+def _resample(x: np.ndarray, sr: int) -> np.ndarray:
+    if sr == RATE:
+        return x
+    n = int(round(len(x) * RATE / sr))
+    return np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x).astype(np.float32)
 
 
 def _kokoro(cfg: TTSConfig, root):
@@ -63,6 +87,18 @@ def style_for(kind: str, text: str) -> str:
 
 def synthesize(cfg: TTSConfig, key: str | None, text: str, style: str, root=None) -> np.ndarray:
     """Mono float32 samples at RATE."""
+    if cfg.engine == "f5":
+        from pathlib import Path as _P
+
+        base = root or _P.cwd()
+        ref = base / cfg.ref_audio
+        if not cfg.ref_audio or not ref.is_file():
+            raise RuntimeError(f"f5 TTS needs tts.ref_audio, a recording of the voice (not found: {ref})")
+        if not cfg.ref_text.strip():
+            raise RuntimeError("f5 TTS needs tts.ref_text: exactly what is said in the recording")
+        kind = next((k for k, v in STYLES.items() if v == style), "ball")
+        wav, sr, _ = _f5(base).infer(str(ref), cfg.ref_text, text, show_info=lambda *a, **k: None, speed=PACE[kind])
+        return _resample(np.asarray(wav, np.float32), sr)
     if cfg.engine == "kokoro":
         from pathlib import Path as _P
 
@@ -123,7 +159,7 @@ class ClipCache:
         folder.mkdir(parents=True, exist_ok=True)
 
     def path(self, cfg: TTSConfig, text: str, style: str) -> Path:
-        h = hashlib.sha256(json.dumps([cfg.engine, cfg.model, cfg.voice, text, style]).encode()).hexdigest()[:20]
+        h = hashlib.sha256(json.dumps([cfg.engine, cfg.model, cfg.voice, cfg.ref_audio, cfg.ref_text, text, style]).encode()).hexdigest()[:20]
         return self.folder / f"{h}.wav"
 
     def get_or_make(self, cfg: TTSConfig, key: str | None, text: str, style: str, root=None) -> np.ndarray:

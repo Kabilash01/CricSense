@@ -130,7 +130,25 @@ part only: `python -m cricsense scoreboard --video "<match>" --start 6500 --end 
 
 ---
 
-## 8. Database, API and live mode
+## 8. A commentator's voice (F5-TTS voice cloning)
+
+Only a voice whose owner agreed - your own, or a friend's with their permission. Never a
+celebrity's or any real person's voice without consent (it is a deepfake of them, and illegal in
+many places).
+
+1. Record 8-15 s of the person reading a sentence in a quiet room (phone or laptop is fine), one
+   steady voice, no music. Convert it: `ffmpeg -i recording.m4a -ac 1 -ar 24000 voices/name.wav`
+   (`voices/` is never committed - it is personal data).
+2. In `configs/commentary.yaml`, under `tts:` set `engine: f5`, `ref_audio: voices/name.wav` and
+   `ref_text: "..."` - exactly the words in the recording (a mismatch makes the voice slur).
+3. `python -m cricsense run --video data/<clip>.mp4 --voice --fresh voice render`, then `make demo`.
+
+Install once: `pip install -e ".[clone-voice]"` (it adds torchaudio 2.11 next to torch 2.14 - tested;
+the environment before it is in `docs/history/ball-env-before-f5tts.txt` to roll back). The model
+(~1.4 GB, non-commercial licence - fine for this project) downloads into `models/tts/f5` the first
+time; on the GPU it speaks faster than real time. Back to the default voice: `engine: kokoro`.
+
+## 9. Database, API and live mode
 
 ```bash
 make db          # a local PostgreSQL for this project (no root)
