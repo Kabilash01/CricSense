@@ -114,7 +114,10 @@ class Scene:
             evs = by_delivery.get(d.delivery_id, {})
             rel = evs.get(EventType.RELEASE)
             p = rel.payload if rel else {}
-            title = f"{p['over']}  {p['bowler']} → {p['striker']}" if "bowler" in p else f"Delivery {d.delivery_id + 1}"
+            if "bowler" in p:  # the striker is missing when the bar did not show who faced
+                title = f"{p['over']}  {p['bowler']}" + (f" → {p['striker']}" if p.get("striker") else "")
+            else:
+                title = f"Delivery {d.delivery_id + 1}"
             if p.get("radar_speed_kph"):
                 speed, source = f"{p['radar_speed_kph']:g} km/h", "radar"
             elif p.get("speed_estimate_kph"):

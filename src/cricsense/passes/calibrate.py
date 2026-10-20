@@ -17,8 +17,8 @@ import cv2
 import numpy as np
 
 from cricsense.calibration import pitch_model
-from cricsense.calibration.auto import CORNER_NAMES, find_views
-from cricsense.calibration.camera_motion import read_frames, track_video
+from cricsense.calibration.auto import ACCEPT, CORNER_NAMES, calibrate, find_views
+from cricsense.calibration.camera_motion import _shows_pitch, read_frames, track_video
 from cricsense.calibration.homography import CalibrationError, reprojection_errors
 from cricsense.calibration.picker import PickerSession, draw_session, run_picker
 from cricsense.config import Config, video_id_from_path
@@ -26,6 +26,7 @@ from cricsense.io import VideoReader, read_yaml_doc, write_doc, write_yaml_doc
 from cricsense.schema import CalibrationDoc, CameraDoc, LandmarkObservation, ReferenceView
 
 log = logging.getLogger("cricsense.calibrate")
+AUTO_STEP_S = 0.5  # automatic calibration looks at a frame this often (only those showing the pitch)
 
 
 @dataclass(frozen=True)
@@ -122,8 +123,9 @@ def run_calibrate(
             raise CalibrationError(f"{cal_path} does not exist; calibrate a reference view first")
         calibration = existing
     elif auto:
-        # dense enough that a short clip still yields a few frames of each view, sparse for a match
-        step = auto_step_s if auto_step_s is not None else min(2.0, max(0.5, meta.n_frames / meta.fps / 150))
+        # every 0.5 s, so a main view shown only in 1-1.5 s bursts between replays is still caught
+        # (Starc's over of four sixes, Super 8: sampled every 2 s, no frame; every 0.5 s, ten)
+        step = auto_step_s if auto_step_s is not None else AUTO_STEP_S
         known = None
         if cameras_from is not None:  # the same match's cameras, from another clip's calibration
             from cricsense.calibration.camera_pose import CameraPose
@@ -179,7 +181,16 @@ def run_calibrate(
 def _auto_views(cfg: Config, video: Path, meta, step_s: float, out_dir: Path, known=None) -> tuple[CalibrationDoc, Path]:
     """Reference views without clicks: see cricsense.calibration.auto."""
     step = max(1, int(round(step_s * meta.fps)))
-    frames = read_frames(video, range(0, meta.n_frames, step), cfg.video.resize)
+    # only frames that show the pitch and calibrate are kept: a clip's worth of full frames
+    # would not fit in memory, and most frames are close-ups, replays or adverts
+    frames = {}
+    with VideoReader(video, resize=cfg.video.resize) as reader:
+        for frame in reader:
+            if frame.frame_id % step or not _shows_pitch(frame.image, cfg.camera.gate_min_pitch or 0.03):
+                continue
+            cal = calibrate(frame.image)
+            if cal is not None and cal.score >= ACCEPT:
+                frames[frame.frame_id] = frame.image
     views = find_views(frames, known_cameras=known)
     if not views:
         raise CalibrationError("no frame shows the pitch's creases clearly enough to calibrate automatically")

@@ -1,0 +1,124 @@
+schema_version: '1.0'
+video_id: replay-super-8s_i1_o3
+image_size: [1920, 1080]
+views:
+- name: auto_0
+  source_video: data/replay-super-8s_i1_o3.mp4
+  frame_id: 8256
+  image_to_pitch:
+  - [0.00031475349974885864, 0.07871033659902095, -31.177566231190585]
+  - [0.008548618963814062, -8.64667306280814e-05, -8.1939623288912]
+  - [2.3684757956568117e-05, 0.0007258526042377484, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [759.1632092633907, 413.5]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1167.5378683558292, 412.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [722.741974101419, 772.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1211.8119164293535, 773.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_1
+  source_video: data/replay-super-8s_i1_o3.mp4
+  frame_id: 8220
+  image_to_pitch:
+  - [0.0005506421662750653, 0.15231399783847777, -54.2659271929691]
+  - [0.01558939665644869, -0.0007855544718871178, -14.75916898154477]
+  - [1.0599693288521208e-05, 0.001746875353880854, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [825.5880952380952, 366.5]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1104.8885048643112, 365.5]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [801.7701079315758, 610.9493057344995]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1153.400723119035, 609.9167588259015]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_2
+  source_video: data/replay-super-8s_i1_o3.mp4
+  frame_id: 9132
+  image_to_pitch:
+  - [-2.2593163826462503e-05, 0.08667188340254486, -29.876007170512594]
+  - [0.009400596128877222, -8.56346473780691e-05, -8.997999688870474]
+  - [-1.8518986308706262e-05, 0.0008261899187565802, 0.9999999999999999]
+  fit_points:
+  - name: striker_popping_left
+    image: [779.9797125933488, 363.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1140.0441241144865, 363.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [745.6821377898947, 683.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1179.72912896371, 681.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_3
+  source_video: data/replay-super-8s_i1_o3.mp4
+  frame_id: 3324
+  image_to_pitch:
+  - [0.0017511255586682823, 0.0830163548086893, -31.30036122981256]
+  - [0.009099808608003341, -4.7039667300070786e-05, -8.764007387903913]
+  - [9.679068972629072e-05, 0.0007754051899299125, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [766.3947404319819, 381.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1168.4439990480075, 373.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [728.9147082467267, 735.1740044542989]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1211.7256517417961, 735.7264205339064]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_4
+  source_video: data/replay-super-8s_i1_o3.mp4
+  frame_id: 3288
+  image_to_pitch:
+  - [-3.815472348622737e-05, 0.1569653202630738, -54.65730249092045]
+  - [0.016026014473797704, -0.00054973293712281, -15.321796436507181]
+  - [-3.127436277990924e-05, 0.0017873349915509497, 1.0]
+  fit_points:
+  - name: striker_popping_left
+    image: [835.081182795699, 361.0]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1101.1156319733907, 361.0]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [808.7610189161726, 593.5]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1142.938626126126, 592.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null

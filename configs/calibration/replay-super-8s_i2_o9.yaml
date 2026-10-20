@@ -1,0 +1,52 @@
+schema_version: '1.0'
+video_id: replay-super-8s_i2_o9
+image_size: [1920, 1080]
+views:
+- name: auto_0
+  source_video: data/replay-super-8s_i2_o9.mp4
+  frame_id: 5000
+  image_to_pitch:
+  - [0.00036920110936318636, 0.07882040280040034, -29.84067491939527]
+  - [0.008530693918560688, -7.729288433405766e-05, -8.159635969384285]
+  - [1.2423441733839866e-05, 0.0007341607801592657, 0.9999999999999999]
+  fit_points:
+  - name: striker_popping_left
+    image: [758.9997279368813, 395.14999546561467]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [1161.7169535699102, 393.3202825594985]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [722.0792390819964, 749.0]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [1205.3061764390734, 748.0]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null
+- name: auto_1
+  source_video: data/replay-super-8s_i2_o9.mp4
+  frame_id: 2050
+  image_to_pitch:
+  - [0.0016508145232931144, 0.33208458559937426, -177.4526438824457]
+  - [0.036133998791416946, 0.0091035666362774, -29.08533269985384]
+  - [-2.859352096684979e-06, 0.003168270361884392, 0.9999999999999999]
+  fit_points:
+  - name: striker_popping_left
+    image: [569.3608187134503, 541.5]
+    pitch: [1.22, -1.32]
+  - name: striker_popping_right
+    image: [767.7642163959167, 540.5]
+    pitch: [1.22, 1.32]
+  - name: bowler_popping_left
+    image: [504.3912299155205, 718.1839054042514]
+    pitch: [18.900000000000002, -1.32]
+  - name: bowler_popping_right
+    image: [743.7703842858334, 716.6846559982247]
+    pitch: [18.900000000000002, 1.32]
+  check_points: []
+  fit_rms_px: 0.0
+  check_rms_m: null
+  check_max_m: null

@@ -12,6 +12,12 @@ clips:
   final_0051_6min:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 3055.0
+  replay-super-8s_i1_o3:
+    source: Cricket match/replay-super-8s-aus-vs-ind.mp4
+    start_s: 2409.28
+  replay-super-8s_i2_o9:
+    source: Cricket match/replay-super-8s-aus-vs-ind.mp4
+    start_s: 11542.24
   st_001500:
     match: replay-final-sa-vs-ind
   st_003000:

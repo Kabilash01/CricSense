@@ -40,7 +40,7 @@ def test_blend_clips_at_the_frame_edge_and_respects_alpha():
     assert chip("SIX", 20).shape[2] == 4
 
 
-def _scene() -> Scene:
+def _scene(release: dict | None = None) -> Scene:
     frames = [BallFrame(frame_id=f, t=f / 25, uv=(300 + f % 10, 100 + f % 50), observed=True, delivery_id=0) for f in range(100, 112)]
     deliveries = [
         Delivery(
@@ -62,7 +62,7 @@ def _scene() -> Scene:
     ]
     ball = BallDoc(video=VIDEO, frames=frames, deliveries=deliveries)
     ev = [
-        Event(frame_id=100, t=4.0, type=EventType.RELEASE, payload={"delivery_id": 0, "bowler": "NORTJE", "striker": "KOHLI", "over": "12.1", "radar_speed_kph": 140.0}, confidence=0.8, source="t"),
+        Event(frame_id=100, t=4.0, type=EventType.RELEASE, payload=release or {"delivery_id": 0, "bowler": "NORTJE", "striker": "KOHLI", "over": "12.1", "radar_speed_kph": 140.0}, confidence=0.8, source="t"),
         Event(frame_id=300, t=12.0, type=EventType.RUNS, payload={"delivery_id": 0, "runs": 6, "off_bat": 6, "extras": 0, "kind": "legal", "striker": "KOHLI"}, confidence=0.9, source="t"),
         Event(frame_id=300, t=12.0, type=EventType.BOUNDARY, payload={"delivery_id": 0, "kind": "SIX"}, confidence=0.9, source="t"),
         Event(frame_id=600, t=24.0, type=EventType.RELEASE, payload={"delivery_id": 1}, confidence=0.8, source="t"),
@@ -79,6 +79,12 @@ def test_card_lasts_until_after_the_outcome_but_not_into_the_next_ball():
     assert s.active(300 + 150) is None  # CARD_HOLD_S is over
     assert s.active(600).did == 1
     assert [b[1] for b in s.banners] == ["SIX  KOHLI"]
+
+
+def test_a_delivery_with_a_bowler_but_no_striker_is_titled_without_one():
+    # after a wicket the bar shows the incoming batter, so the out batter's ball has no striker
+    s = _scene(release={"delivery_id": 0, "bowler": "KULDEEP", "over": "8.6"})
+    assert s.deliveries[0].title == "8.6  KULDEEP"
 
 
 def test_compose_draws_without_changing_the_frame_size():

@@ -186,7 +186,7 @@ def summarize(doc: EventsDoc, path: Path) -> list[str]:
     for did, evs in sorted(by_delivery.items()):
         rel = next((e for e in evs if e.type == EventType.RELEASE), None)
         if rel and "bowler" in rel.payload:
-            head = f"{rel.payload['over']} {rel.payload['bowler']} to {rel.payload['striker']}"
+            head = f"{rel.payload['over']} {rel.payload['bowler']} to {rel.payload.get('striker', '?')}"
         else:
             head = f"delivery {did} at {evs[0].t:.1f} s"
         parts = []

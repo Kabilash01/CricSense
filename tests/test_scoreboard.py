@@ -38,7 +38,8 @@ def test_parse_score(text, expected):
 
 
 @pytest.mark.parametrize(
-    "text, balls", [("11.1 OVERS", 67), ("11 OVERS", 66), ("3 oVERS", 18), ("1.1", 7), ("11.7", None), ("", None), ("3 2.40", 16), ("5 4.3", 27)]
+    "text, balls", [("11.1 OVERS", 67), ("11 OVERS", 66), ("3 oVERS", 18), ("1.1", 7), ("11.7", None), ("", None), ("3 2.40", 16), ("5 4.3", 27),
+     ("9OVERS", 54), ("8.1OVERS", 49), ("1OOVERS", 60), ("OOVERS", None), ("11 OVERS", 66), ("3 2.4OVERS", 16)]
 )
 def test_parse_overs(text, balls):
     assert parse_overs(text) == balls

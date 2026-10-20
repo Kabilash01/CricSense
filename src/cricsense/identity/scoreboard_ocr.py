@@ -27,6 +27,9 @@ Rect = tuple[int, int, int, int]
 
 _NAME_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
 _NUMBER_CHARS = "0123456789-."
+# The overs field reads "9 OVERS": with digits only, the O of OVERS became a 0 ("90" - 558 to 733
+# readings a match, every over's end, thrown away as impossible); with its letters it reads "9OVERS".
+_OVERS_CHARS = "0123456789.OVERS"
 _BOX_AT_LAYOUT_PX = 25  # score box centre this close to the layout's score rectangle centre: bar not moved
 _MIN_SPEED_KPH, _MAX_SPEED_KPH = 50.0, 170.0  # anything outside is a misread, not a delivery
 
@@ -85,7 +88,13 @@ def parse_score(text: str) -> tuple[int | None, int | None]:
 def parse_overs(text: str) -> int | None:
     """'11.1 OVERS' -> 67 legal balls; '11 OVERS' -> 66. A ball digit above 5 is a misread.
     An overs.balls number wins over a bare one: beside a moved score box the OCR picks up a stray
-    digit first ("3 2.40" for 2.4 overs), which as 3 overs blocked the next balls' states."""
+    digit first ("3 2.40" for 2.4 overs), which as 3 overs blocked the next balls' states.
+    Read with its letters ("9OVERS"): the word is dropped, an O left among the digits is a 0
+    ("1OOVERS" is 10 overs), and nothing numeric left (a 9 read as O) is unknown."""
+    text = re.sub(r"O?V\s*E\s*R\s*S?\s*$", "", text.strip().upper())
+    if not re.search(r"\d", text):
+        return None
+    text = text.replace("O", "0")
     m = re.search(r"(\d{1,2})\s*\.\s*(\d)", text) or re.search(r"(\d{1,2})()", text)
     if not m:
         return None
@@ -337,6 +346,8 @@ class ScoreboardReader:
             config = f"--psm 7 -c tessedit_char_whitelist={_NAME_CHARS.replace(' ', '')}"
         elif field == "lower":
             config = "--psm 7"
+        elif field == "overs":
+            config = f"--psm 7 -c tessedit_char_whitelist={_OVERS_CHARS}"
         else:
             config = f"--psm 7 -c tessedit_char_whitelist={_NUMBER_CHARS}"
         return pytesseract.image_to_string(binary, config=config).strip()

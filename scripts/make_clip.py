@@ -21,7 +21,8 @@ from pathlib import Path
 
 import yaml
 
-CLIPS_YAML = Path(__file__).resolve().parents[1] / "configs" / "clips.yaml"
+ROOT = Path(__file__).resolve().parents[1]
+CLIPS_YAML = ROOT / "configs" / "clips.yaml"
 
 
 def parse_time(value: str) -> float:
@@ -82,7 +83,9 @@ def main(argv: list[str] | None = None) -> int:
 def record_source(name: str, video: Path, start: float) -> None:
     raw = yaml.safe_load(CLIPS_YAML.read_text()) if CLIPS_YAML.is_file() else None
     raw = raw or {}
-    raw.setdefault("clips", {})[name] = {"source": str(video), "start_s": round(start, 3)}
+    video = video.resolve()  # stored relative to the repo, so the file works on another machine
+    source = video.relative_to(ROOT) if video.is_relative_to(ROOT) else video
+    raw.setdefault("clips", {})[name] = {"source": str(source), "start_s": round(start, 3)}
     header = "".join(line + "\n" for line in CLIPS_YAML.read_text().splitlines() if line.startswith("#")) if CLIPS_YAML.is_file() else ""
     CLIPS_YAML.write_text(header + yaml.safe_dump(raw, sort_keys=True))
 
