@@ -1,6 +1,6 @@
 """How much of a whole match the score bar was read for: ball counts seen per innings.
 
-    python scripts/coverage.py outputs/replay-final-sa-vs-ind/scoreboard.json
+    python scripts/match_coverage.py outputs/replay-final-sa-vs-ind/scoreboard.json
 
 Run `cricsense scoreboard --video <whole match>` first. For each innings: how many of the 121
 ball counts (0 to 120 legal balls) appear in a trusted score-bar state, how many steps were

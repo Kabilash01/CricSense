@@ -206,7 +206,7 @@ and 40/40 score checks as before):
 
 ## Score-box font templates over the whole match
 
-A full rescan (46 min) with the glyph reader, measured by `scripts/coverage.py`:
+A full rescan (46 min) with the glyph reader, measured by `scripts/match_coverage.py`:
 
 | | India | South Africa |
 |---|---|---|

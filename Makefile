@@ -10,7 +10,7 @@ START ?=
 END   ?=
 export PYTORCH_CUDA_ALLOC_CONF := expandable_segments:True
 
-.PHONY: help doctor models test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
+.PHONY: help doctor models say voices test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
 
 help:  ## list the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -24,6 +24,12 @@ models:  ## download every model (~480 MB): this project's from its GitHub relea
 	$(PY) -c "from ultralytics import YOLO; [YOLO(m) for m in ('models/yolov8m.pt', 'models/yolo11x-pose.pt')]"
 	mkdir -p models/tts
 	cd models/tts && for f in kokoro-v1.0.int8.onnx voices-v1.0.bin; do test -f $$f || curl -fL -o $$f https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$$f; done
+
+say:  ## hear the commentary voice:  make say TEXT="Four!"  (ARGS="--style big --voice bm_lewis")
+	$(PY) scripts/say.py $(if $(TEXT),"$(TEXT)") $(ARGS)
+
+voices:  ## one sentence in 10 Kokoro voices, to pick one by ear
+	$(PY) scripts/say.py --audition $(if $(TEXT),"$(TEXT)")
 
 test:  ## the unit tests (~30 s)
 	$(PY) -m pytest -q
@@ -60,7 +66,7 @@ scan:  ## read the score bar over the whole match (~2-3 h)
 	$(CS) scoreboard --video "$(MATCH)"
 
 coverage:  ## how much of the whole match was read, and the final scores (after make scan)
-	$(PY) scripts/coverage.py outputs/$(MATCH_ID)/scoreboard.json
+	$(PY) scripts/match_coverage.py outputs/$(MATCH_ID)/scoreboard.json
 
 demo:  ## the demo video from configs/demo.yaml (run each clip with voice first)
 	$(PY) scripts/make_demo.py

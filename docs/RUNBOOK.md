@@ -130,7 +130,22 @@ part only: `python -m cricsense scoreboard --video "<match>" --start 6500 --end 
 
 ---
 
-## 8. A commentator's voice (F5-TTS voice cloning)
+## 8. A commentator's voice
+
+**Hear it before changing anything** - writes to `outputs/tts_test/` and plays it:
+
+```bash
+make say                                        # the configured voice, a sample line
+make say TEXT="SIX! Into the stands!" ARGS="--style big"
+make voices                                     # one sentence in 10 Kokoro voices, to pick by ear
+make say ARGS="--voice hm_omega"                # try one of them (python scripts/say.py --list-voices: all 54)
+make say ARGS='--engine f5 --ref-audio voices/me.m4a --ref-text "the exact words in the recording"'
+```
+
+To keep a Kokoro voice: `voice:` under `tts:` in `configs/commentary.yaml`, then
+`python -m cricsense run --video data/<clip>.mp4 --voice --fresh voice render` and `make demo`.
+
+### A cloned voice (F5-TTS)
 
 Only a voice whose owner agreed - your own, or a friend's with their permission. Never a
 celebrity's or any real person's voice without consent (it is a deepfake of them, and illegal in
