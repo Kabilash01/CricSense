@@ -7,6 +7,7 @@ Run `make scan MATCH=...` first. For every over: the time the score bar first sh
 into the video), the bowler, the score before and after, the runs and wickets in it, and a
 `make clip` line that cuts it with a little margin. Times come from the score bar, so an over the
 bar did not show cleanly is missing or approximate - check the clip before relying on it.
+(`python main.py <match video> --overs 1:3` cuts and analyses overs in one go.)
 """
 
 from __future__ import annotations
@@ -15,14 +16,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from cricsense.fuse.outcome import batting_side, score_track, trusted_states
+from cricsense.fuse.overs import overs
 from cricsense.identity.match_sheet import MatchSheet
 from cricsense.io import read_doc
 from cricsense.schema import ScoreboardDoc
 
 ROOT = Path(__file__).resolve().parents[1]
-BEFORE_S = 20.0  # the clip starts this long before the over's first ball is shown on the bar
-AFTER_S = 15.0  # ... and ends this long after the next over appears
 
 
 def hms(t: float) -> str:
@@ -39,44 +38,19 @@ def main(argv: list[str] | None = None) -> int:
 
     match = args.scan.resolve().parent.name
     sheet = MatchSheet.from_yaml(ROOT / "configs" / "matches" / f"{match}.yaml")
-    squad = set(sheet.all_names)
-    team_of = {n: t.code for t in sheet.teams for n in t.squad}
-    board = read_doc(args.scan, ScoreboardDoc)
-    states = trusted_states(board.readings, squad, team_of)
-    starts = [b.t for a, b in zip(states, states[1:]) if batting_side(a, team_of) != batting_side(b, team_of)]
-    cut = starts[0] if starts else float("inf")
-    track = score_track(board.readings, starts)
-    # the bowler of each over: the full states name him; the score-only track does not
-    bowler_at = [(s.t, s.legal_balls, s.bowler) for s in states]
     video = args.video or f"Cricket match/{match}.mp4"
-
-    for k, (lo, hi) in enumerate(((0.0, cut), (cut, float("inf")))):
-        if args.innings and args.innings != k + 1:
+    innings = None
+    for o in overs(read_doc(args.scan, ScoreboardDoc), sheet):
+        if (args.innings and o.innings != args.innings) or (args.min_runs and (o.runs is None or o.runs < args.min_runs)):
             continue
-        inn = [s for s in track if lo <= s.t < hi]
-        if not inn:
-            continue
-        side = next((batting_side(s, team_of) for s in states if lo <= s.t < hi and batting_side(s, team_of)), "?")
-        print(f"\ninnings {k + 1} ({side} batting)")
-        print(f"  {'over':>4}  {'starts':>8}  {'video s':>7}  {'bowler':<11} {'score':>11}  {'runs':>4} {'wkts':>4}")
-        for over in range(20):
-            first = next((s for s in inn if s.legal_balls >= over * 6 and s.legal_balls < over * 6 + 6), None)
-            end = next((s for s in inn if s.legal_balls >= (over + 1) * 6), None)
-            if first is None:
-                print(f"  {over + 1:>4}  (not read)")
-                continue
-            before = max((s for s in inn if s.legal_balls <= over * 6), key=lambda s: s.t, default=None)
-            bowler = next((b for t, lb, b in bowler_at if lo <= t < hi and over * 6 < lb <= over * 6 + 6), "?")
-            runs = (end.runs - before.runs) if end and before else None
-            wkts = (end.wickets - before.wickets) if end and before else None
-            if args.min_runs and (runs is None or runs < args.min_runs):
-                continue
-            t0 = max(0.0, (before.t if before else first.t) - BEFORE_S)
-            t1 = (end.t if end else first.t + 300) + AFTER_S
-            score = f"{before.runs}-{before.wickets}" if before else "?"
-            score += f" > {end.runs}-{end.wickets}" if end else ""
-            print(f"  {over + 1:>4}  {hms(t0):>8}  {t0:7.0f}  {bowler.title():<11} {score:>11}  {'' if runs is None else runs:>4} {'' if wkts is None else wkts:>4}"
-                  f"   make clip MATCH=\"{video}\" START={t0:.0f} END={t1:.0f} CLIP={match[:12]}_i{k + 1}_o{over + 1}")
+        if o.innings != innings:
+            innings = o.innings
+            print(f"\ninnings {o.innings} ({o.batting or '?'} batting)")
+            print(f"  {'over':>4}  {'starts':>8}  {'video s':>7}  {'bowler':<11} {'score':>13}  {'runs':>4} {'wkts':>4}")
+        score = (f"{o.before[0]}-{o.before[1]}" if o.before else "?") + (f" > {o.after[0]}-{o.after[1]}" if o.after else "")
+        print(f"  {o.over:>4}  {hms(o.start_s):>8}  {o.start_s:7.0f}  {(o.bowler or '?').title():<11} {score:>13}  "
+              f"{'' if o.runs is None else o.runs:>4} {'' if o.wickets is None else o.wickets:>4}"
+              f"   make clip MATCH=\"{video}\" START={o.start_s:.0f} END={o.end_s:.0f} CLIP={match[:16].rstrip('-_')}_i{o.innings}_o{o.over}")
     return 0
 
 

@@ -6,6 +6,13 @@ what to do when it did not. The commands run in the conda env `ball`; the Makefi
 
 ---
 
+## The one command
+
+`python main.py <video>` does everything below for you: a clip is analysed in full; a whole
+match is checked for its team sheet, its score bar read once, its final scores printed, and its
+overs listed - then `--overs 1:3 2:15` (or `big`, `all`, or `--start/--end` in seconds) cuts and
+analyses them. Re-running reuses what is done. The sections below are the same steps one by one.
+
 ## 0. Before anything: is the machine ready?
 
 ```bash

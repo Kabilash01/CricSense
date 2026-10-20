@@ -62,7 +62,20 @@ in `configs/matches/<video name>.yaml`. `make doctor` then says whether everythi
 Optional keys in `.env` (gitignored): `LIGHTNING_API_KEY` (commentary and shot reading through
 Lightning AI) or `GEMINI_API_KEY`; without one, commentary uses templates.
 
-## Run it yourself
+## Run it: one command
+
+```bash
+python main.py data/my_clip.mp4                              # a clip: everything, with spoken commentary
+python main.py "Cricket match/match.mp4"                     # a whole match: final scores read, every over listed
+python main.py "Cricket match/match.mp4" --overs 1:3 2:15    # ... analyse those overs (innings:over)
+python main.py "Cricket match/match.mp4" --overs big         # ... every over of 15+ runs or a wicket
+```
+
+Results in `outputs/<clip>/` (`overlay.mp4` is the annotated video). A new match needs its team
+sheet, `configs/matches/<video name>.yaml`; without one `main.py` lists the names the score bar
+prints and says what to do.
+
+## Run it yourself, step by step
 
 Every task is one command - `make help` lists them, and [docs/RUNBOOK.md](docs/RUNBOOK.md)
 says for each how long it takes, how to tell if it worked and what to do when it did not:
