@@ -63,7 +63,7 @@ class PlayerFrame(_Strict):
     identity: str | None = None  # name, where one is known
     identity_conf: float = Field(default=0.0, ge=0.0, le=1.0)
     # "scoreboard": read off the broadcast bar (striker, non-striker, bowler);
-    # "match_sheet": the fielding side's keeper from configs/match.yaml
+    # "match_sheet": the fielding side's keeper from configs/matches/<match>.yaml
     identity_source: Literal["scoreboard", "match_sheet"] | None = None
     team: str | None = None  # batting side for batters, fielding side for the rest; None for umpires
 

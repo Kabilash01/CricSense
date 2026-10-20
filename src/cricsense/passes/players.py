@@ -18,7 +18,7 @@ import numpy as np
 from ultralytics import YOLO
 
 from cricsense.config import Config, video_id_from_path
-from cricsense.identity.match_sheet import MatchSheet
+from cricsense.identity.match_sheet import MatchSheet, load_sheet
 from cricsense.identity.registry import Detection, PlayerRegistry, RegistryOptions
 from cricsense.identity.role_assigner import RoleAssigner, RoleOptions
 from cricsense.io import VideoReader, read_doc, write_doc
@@ -359,11 +359,11 @@ def run_players(cfg: Config, video: Path, tracker_yaml: Path | None = None, out_
         )
         for f in frames_out
     ]
-    sheet_path = cfg.root / "configs" / "match.yaml"
-    if sheet_path.is_file():
+    sheet = load_sheet(cfg.root, video_id)
+    if sheet is not None:
         keeper_share = {sid: v[Role.KEEPER] / sum(v.values()) for sid, v in role_votes.items()}
         shot_of = {sid: voter.shot_of(sid) for sid in role_votes}
-        frames_out = assign_teams(frames_out, MatchSheet.from_yaml(sheet_path), shot_of, keeper_share)
+        frames_out = assign_teams(frames_out, sheet, shot_of, keeper_share)
     run = RunInfo(wall_time_s=time.perf_counter() - t0, frames_processed=processed, device=cfg.device)
     doc = PlayersDoc(video=meta, run=run, frames=frames_out)
     path = write_doc(doc, out_dir / out_name)

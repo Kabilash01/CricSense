@@ -15,7 +15,7 @@ from cricsense.commentary.llm import WORDS_PER_S, Cache, LLMConfig, api_key, che
 from cricsense.commentary.templates import after_line, ball_line
 from cricsense.commentary.vlm import contact_frames, name_shot, read_shot
 from cricsense.config import Config
-from cricsense.identity.match_sheet import MatchSheet
+from cricsense.identity.match_sheet import load_sheet
 from cricsense.io import read_doc, write_doc
 from cricsense.schema import BallDoc, CommentaryDoc, CommentaryLine, EventsDoc, MatchDoc, PlayersDoc, PoseDoc, Role
 
@@ -51,8 +51,7 @@ def run_commentary(cfg: Config, video_id: str, engine: str | None = None, vlm: b
     ball = read_doc(out_dir / "ball.json", BallDoc)
     events = read_doc(out_dir / "events.json", EventsDoc)
     match = read_doc(out_dir / "match.json", MatchDoc) if (out_dir / "match.json").is_file() else None
-    sheet_path = cfg.root / "configs" / "match.yaml"
-    sheet = MatchSheet.from_yaml(sheet_path) if sheet_path.is_file() else None
+    sheet = load_sheet(cfg.root, video_id)
     squad = set(sheet.all_names) if sheet else set()
     fps, n_frames = ball.video.fps, ball.video.n_frames
     pose = read_doc(out_dir / "pose.json", PoseDoc) if (out_dir / "pose.json").is_file() else None

@@ -57,7 +57,7 @@ Models go in `models/` (not in git):
   first use, and the Kokoro voice (`tts/kokoro-v1.0.int8.onnx`, `tts/voices-v1.0.bin`).
 
 The match video is not included (broadcast footage): use your own recording, and set the teams
-in `configs/match.yaml`. `make doctor` then says whether everything is in place.
+in `configs/matches/<video name>.yaml`. `make doctor` then says whether everything is in place.
 
 Optional keys in `.env` (gitignored): `LIGHTNING_API_KEY` (commentary and shot reading through
 Lightning AI) or `GEMINI_API_KEY`; without one, commentary uses templates.
@@ -96,7 +96,8 @@ cricsense live --video data/clip.mp4 --calibration configs/calibration/<clip>.ya
 
 ## For a new match
 
-1. `configs/match.yaml`: the two squads as the score bar prints them, and the keepers.
+1. `configs/matches/<video name>.yaml`: the two squads as the score bar prints them, and the keepers
+   (one file per match; copy one of the two there).
 2. `configs/scoreboard.yaml`: the broadcaster's score-bar layout (one file per graphics package).
 3. Run. Calibration is automatic; for short clips `calibrate --auto --cameras-from <another clip of the match>.yaml` helps.
 The ball detector was fine-tuned on this broadcast; another may need a short labelling round

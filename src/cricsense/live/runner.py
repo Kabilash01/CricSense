@@ -30,6 +30,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import yaml
 
 from cricsense.config import Config
 
@@ -106,17 +107,16 @@ class Worker(threading.Thread):
 
 
 class ScoreWorker(Worker):
-    def __init__(self, cfg: Config, state: LiveState, start_wall: float) -> None:
+    def __init__(self, cfg: Config, state: LiveState, start_wall: float, video_id: str) -> None:
         super().__init__("score")
         from cricsense.fuse.outcome import trusted_states
-        from cricsense.identity.match_sheet import MatchSheet
+        from cricsense.identity.match_sheet import layout_path, load_sheet
         from cricsense.identity.scoreboard_ocr import ScoreboardLayout, ScoreboardReader
 
-        sheet_path = cfg.root / "configs" / "match.yaml"
-        sheet = MatchSheet.from_yaml(sheet_path) if sheet_path.is_file() else None
+        sheet = load_sheet(cfg.root, video_id)  # the match of the clip the calibration came from
         self.squad = set(sheet.all_names) if sheet else set()
         self.team_of = {n: t.code for t in sheet.teams for n in t.squad} if sheet else None
-        self.reader = ScoreboardReader(ScoreboardLayout.from_yaml(cfg.root / "configs" / "scoreboard.yaml"), tuple(self.squad))
+        self.reader = ScoreboardReader(ScoreboardLayout.from_yaml(layout_path(cfg.root, video_id)), tuple(self.squad))
         self.trusted = trusted_states
         self.readings: deque = deque(maxlen=400)  # the last few minutes is all the rules need
         self.state, self.t0 = state, start_wall
@@ -403,7 +403,8 @@ def run_live(
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     state = LiveState()
     buffer: deque = deque(maxlen=int(BUFFER_S * fps))  # the last seconds of frames, for a shot's delivery
-    score = ScoreWorker(cfg, state, 0.0)
+    match_video = yaml.safe_load(Path(calibration_yaml).read_text()).get("video_id") or Path(str(source)).stem
+    score = ScoreWorker(cfg, state, 0.0, match_video)
     vb = ViewBallWorker(cfg, state, 0.0, calibration_yaml, fps, cfg.device, buffer)
     workers = [score, vb]
     # the clock starts once the models are loaded (~8 s): before that nothing is live yet

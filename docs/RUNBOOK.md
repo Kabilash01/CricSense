@@ -108,10 +108,18 @@ part only: `python -m cricsense scoreboard --video "<match>" --start 6500 --end 
 
 ## 6. A new match from the same broadcaster (ICC 2024 graphics)
 
-1. Put the video in `Cricket match/` and pass it: `make clip MATCH="Cricket match/new.mp4" ...`.
-2. `configs/match.yaml`: both squads **exactly as the score bar prints the names** (e.g. "DE KOCK"),
-   the team names and codes, and the wicketkeepers.
-3. `make clip ...` and `make run ...` as in section 1. Calibration is automatic. For a short clip
+Each match has its own team sheet, `configs/matches/<video file name>.yaml`; a clip finds it
+through `configs/clips.yaml` (where `make clip` records the broadcast it was cut from), so
+matches never overwrite each other.
+
+1. Put the video in `Cricket match/`, e.g. `Cricket match/new-match.mp4`.
+2. Copy a sheet: `cp configs/matches/replay-super-8s-aus-vs-ind.yaml configs/matches/new-match.yaml`
+   and set both squads **exactly as the score bar prints the names** (e.g. "DE KOCK"), the team
+   names and codes, and the wicketkeepers. Not sure of the spelling? Open a few frames with the
+   bar on screen and copy it. A missing sheet is reported in the log ("no match sheet for ...").
+3. `make clip MATCH="Cricket match/new-match.mp4" START=... END=... CLIP=...` and
+   `make run CLIP=...` as in section 1. Whole match's scores: `make scan MATCH=...` then
+   `make coverage MATCH=...`. Calibration is automatic. For a short clip
    (under a minute) that fails to calibrate, use a good calibration of a longer clip of the same
    match: `python -m cricsense calibrate --video data/<clip>.mp4 --auto --cameras-from configs/calibration/<longer clip>.yaml`.
 

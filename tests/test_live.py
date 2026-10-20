@@ -18,7 +18,7 @@ def bar(t, runs, balls, kohli, axar, strike="KOHLI", speed=None):
 
 def test_balls_and_radar_are_emitted_once_each_as_the_bar_settles():
     state = LiveState()
-    w = ScoreWorker(load_config(), state, time.perf_counter())
+    w = ScoreWorker(load_config(), state, time.perf_counter(), "final_0051_6min")  # a clip of the 2024 final
     for t in (0.0, 0.5):
         w.update(bar(t, 85, 69, (40, 30), (30, 24), strike="AXAR"))
     for t in (20.0, 20.5, 21.0):  # a six by Axar, radar shown

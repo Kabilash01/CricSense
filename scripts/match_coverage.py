@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("scan", type=Path, help="scoreboard.json of a whole match")
-    ap.add_argument("--sheet", type=Path, default=ROOT / "configs" / "match.yaml")
+    ap.add_argument("--sheet", type=Path, help="default: configs/matches/<the scan's folder name>.yaml")
     args = ap.parse_args(argv)
 
-    sheet = MatchSheet.from_yaml(args.sheet)
+    sheet = MatchSheet.from_yaml(args.sheet or ROOT / "configs" / "matches" / f"{args.scan.resolve().parent.name}.yaml")
     squad = set(sheet.all_names)
     team_of = {n: t.code for t in sheet.teams for n in t.squad}
     board = read_doc(args.scan, ScoreboardDoc)

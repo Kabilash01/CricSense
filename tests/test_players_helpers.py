@@ -77,3 +77,23 @@ def test_match_sheet_rejects_a_keeper_outside_the_squad(tmp_path):
     f.write_text("teams:\n  A: {squad: [X], keeper: Y}\n  B: {squad: [Z]}\n")
     with pytest.raises(ValueError, match="not in the squad"):
         MatchSheet.from_yaml(f)
+
+
+def test_each_clip_finds_its_own_match_sheet(tmp_path):
+    """Several matches side by side: a clip finds its sheet through the broadcast it was cut from."""
+    from cricsense.identity.match_sheet import layout_path, load_sheet, match_of
+
+    (tmp_path / "configs" / "matches").mkdir(parents=True)
+    (tmp_path / "configs" / "clips.yaml").write_text(
+        "clips:\n  a_clip: {source: 'Cricket match/game-one.mp4', start_s: 10}\n  old_clip: {match: game-two}\n"
+    )
+    for game, team, layout in (("game-one", "AAA", None), ("game-two", "CCC", "other_bar.yaml")):
+        text = f"teams:\n  {team}: {{squad: [X1, X2]}}\n  ZZZ: {{squad: [Y1]}}\n" + (f"scoreboard: {layout}\n" if layout else "")
+        (tmp_path / "configs" / "matches" / f"{game}.yaml").write_text(text)
+    assert match_of(tmp_path, "a_clip") == "game-one" and match_of(tmp_path, "old_clip") == "game-two"
+    assert match_of(tmp_path, "game-one") == "game-one"  # a whole-match video is its own match
+    assert load_sheet(tmp_path, "a_clip").teams[0].code == "AAA"
+    assert load_sheet(tmp_path, "old_clip").teams[0].code == "CCC"
+    assert load_sheet(tmp_path, "unknown_clip") is None
+    assert layout_path(tmp_path, "a_clip").name == "scoreboard.yaml"
+    assert layout_path(tmp_path, "old_clip").name == "other_bar.yaml"

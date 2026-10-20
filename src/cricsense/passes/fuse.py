@@ -23,7 +23,7 @@ from cricsense.config import Config
 from cricsense.fuse.contact import find_contact
 from cricsense.fuse.outcome import batting_side, outcome, score_track, trusted_states
 from cricsense.fuse.score_engine import score_innings
-from cricsense.identity.match_sheet import MatchSheet
+from cricsense.identity.match_sheet import load_sheet
 from cricsense.io import read_doc, write_doc
 from cricsense.schema import (
     BallDoc,
@@ -45,8 +45,7 @@ def run_fuse(cfg: Config, video_id: str, bat_weights: Path | None = None) -> tup
     ball = read_doc(out_dir / "ball.json", BallDoc)
     players = read_doc(out_dir / "players.json", PlayersDoc) if (out_dir / "players.json").is_file() else None
     board = read_doc(out_dir / "scoreboard.json", ScoreboardDoc) if (out_dir / "scoreboard.json").is_file() else None
-    sheet_path = cfg.root / "configs" / "match.yaml"
-    sheet = MatchSheet.from_yaml(sheet_path) if sheet_path.is_file() else None
+    sheet = load_sheet(cfg.root, video_id)
     squad = set(sheet.all_names) if sheet else set()
     team_of = {n: t.code for t in sheet.teams for n in t.squad} if sheet else None
     fps, n_frames = ball.video.fps, ball.video.n_frames

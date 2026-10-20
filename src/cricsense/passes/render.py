@@ -45,7 +45,7 @@ def audio_source(cfg: Config, video_id: str, video: Path) -> tuple[Path, float] 
     clips = cfg.root / "configs" / "clips.yaml"
     if clips.is_file():
         entry = ((yaml.safe_load(clips.read_text()) or {}).get("clips") or {}).get(video_id)
-        if entry:
+        if entry and entry.get("source"):
             src = cfg.root / entry["source"]
             if src.is_file() and has_audio(src):
                 return src, float(entry["start_s"])

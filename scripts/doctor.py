@@ -72,8 +72,8 @@ def main() -> int:
         else:  # trained for this project: not downloadable
             row(here, f"{path}  ({why})", "make models  (this project's GitHub release models-v1; needs gh auth login)", path not in OPTIONAL_MODELS)
     print("configs")
-    for path in ("configs/match.yaml", "configs/scoreboard.yaml", "configs/scoreboard_digits.npz"):
-        row((ROOT / path).is_file(), path, "see docs/RUNBOOK.md: a new match / a new broadcaster")
+    for path in ("configs/matches", "configs/scoreboard.yaml", "configs/scoreboard_digits.npz"):
+        row((ROOT / path).exists(), path, "see docs/RUNBOOK.md: a new match / a new broadcaster")
     print("GPU")
     try:
         import torch

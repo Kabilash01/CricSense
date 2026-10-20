@@ -1,0 +1,17 @@
+# Match sheet: facts about the match that the video cannot show reliably.
+# ICC Men's T20 World Cup 2024, Super 8, Australia v India, Daren Sammy Stadium, St Lucia, 24 June 2024.
+# Australia won the toss and fielded; India 205-5, Australia 181-7 (India won by 24 runs).
+#
+# Names are spelled as this broadcast's score bar prints them - checked by sampling the bar
+# every 30 s over the whole video (WADE did not appear in the sample; he kept wicket).
+teams:
+  IND:
+    name: India
+    squad: [ROHIT, KOHLI, PANT, SURYAKUMAR, DUBE, HARDIK, JADEJA, AXAR, KULDEEP, ARSHDEEP, BUMRAH]
+    keeper: PANT
+  AUS:
+    name: Australia
+    squad: [HEAD, WARNER, MARSH, MAXWELL, STOINIS, DAVID, WADE, CUMMINS, STARC, ZAMPA, HAZLEWOOD]
+    keeper: WADE
+# same ICC 2024 graphics as the final
+scoreboard: scoreboard.yaml

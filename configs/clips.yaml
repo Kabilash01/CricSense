@@ -1,6 +1,7 @@
 # Where each dev clip was cut from (scripts/make_clip.py adds an entry per clip).
 # The clips are video-only; the render takes the stadium sound from the source at this offset.
 # Offsets were matched frame by frame against the broadcast (the clip names are not the start).
+# An entry with only `match:` names the match of a clip whose source offset is unknown.
 clips:
   final_0050_10s:
     source: Cricket match/replay-final-sa-vs-ind.mp4
@@ -11,9 +12,25 @@ clips:
   final_0051_6min:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 3055.0
+  st_001500:
+    match: replay-final-sa-vs-ind
+  st_003000:
+    match: replay-final-sa-vs-ind
+  st_010500:
+    match: replay-final-sa-vs-ind
+  st_011500:
+    match: replay-final-sa-vs-ind
+  st_014500:
+    match: replay-final-sa-vs-ind
+  st_020000:
+    match: replay-final-sa-vs-ind
   st_022000:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 8400.0
+  st_024000:
+    match: replay-final-sa-vs-ind
+  st_025500:
+    match: replay-final-sa-vs-ind
   st_bumrah_o2:
     source: Cricket match/replay-final-sa-vs-ind.mp4
     start_s: 6840.0

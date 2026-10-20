@@ -17,6 +17,7 @@ import yaml
 
 from cricsense.config import Config
 from cricsense.store import db
+from cricsense.identity.match_sheet import sheet_path
 from cricsense.store.objects import open_store
 
 FILES = {  # artifact kind -> file in outputs/<video_id>/
@@ -100,7 +101,8 @@ def run_publish(cfg: Config, video_id: str, engine=None) -> dict:
     store = open_store(scfg["storage"], cfg.root)
     clips = yaml.safe_load((cfg.root / "configs" / "clips.yaml").read_text()) if (cfg.root / "configs" / "clips.yaml").is_file() else {}
     src = ((clips or {}).get("clips") or {}).get(video_id)
-    sheet = yaml.safe_load((cfg.root / "configs" / "match.yaml").read_text()) if (cfg.root / "configs" / "match.yaml").is_file() else {}
+    sheet_file = sheet_path(cfg.root, video_id)
+    sheet = yaml.safe_load(sheet_file.read_text()) if sheet_file.is_file() else {}
     counts = {}
     with engine.begin() as conn:
         match_id = None
