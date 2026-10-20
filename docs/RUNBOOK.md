@@ -118,8 +118,11 @@ matches never overwrite each other.
    names and codes, and the wicketkeepers. Not sure of the spelling? Open a few frames with the
    bar on screen and copy it. A missing sheet is reported in the log ("no match sheet for ...").
 3. `make clip MATCH="Cricket match/new-match.mp4" START=... END=... CLIP=...` and
-   `make run CLIP=...` as in section 1. Whole match's scores: `make scan MATCH=...` then
-   `make coverage MATCH=...`. Calibration is automatic. For a short clip
+   `make run CLIP=...` as in section 1. Calibration is automatic.
+4. To find the overs worth cutting: `make scan MATCH=...` (the whole match's score bar, ~45 min),
+   `make coverage MATCH=...` (final scores - compare with the scorecard), then
+   `make overs MATCH=...` - every over's start time, bowler and runs, with a `make clip` line to
+   paste (`ARGS="--innings 2 --min-runs 15"` for the big overs of the chase). For a short clip
    (under a minute) that fails to calibrate, use a good calibration of a longer clip of the same
    match: `python -m cricsense calibrate --video data/<clip>.mp4 --auto --cameras-from configs/calibration/<longer clip>.yaml`.
 

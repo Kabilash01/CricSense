@@ -10,7 +10,7 @@ START ?=
 END   ?=
 export PYTORCH_CUDA_ALLOC_CONF := expandable_segments:True
 
-.PHONY: help doctor models say voices test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
+.PHONY: help doctor models say voices overs test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
 
 help:  ## list the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -67,6 +67,9 @@ scan:  ## read the score bar over the whole match (~2-3 h)
 
 coverage:  ## how much of the whole match was read, and the final scores (after make scan)
 	$(PY) scripts/match_coverage.py outputs/$(MATCH_ID)/scoreboard.json
+
+overs:  ## every over's time, bowler, runs + a make clip line (after make scan):  make overs MATCH=... ARGS="--innings 2"
+	$(PY) scripts/find_overs.py outputs/$(MATCH_ID)/scoreboard.json $(ARGS)
 
 demo:  ## the demo video from configs/demo.yaml (run each clip with voice first)
 	$(PY) scripts/make_demo.py
