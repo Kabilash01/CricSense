@@ -10,13 +10,16 @@ START ?=
 END   ?=
 export PYTORCH_CUDA_ALLOC_CONF := expandable_segments:True
 
-.PHONY: help doctor models say voices overs test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
+.PHONY: help doctor llm-check models say voices overs test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
 
 help:  ## list the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
 
 doctor:  ## is this machine ready? (programs, packages, models, GPU, keys)
 	$(PY) scripts/doctor.py
+
+llm-check:  ## does the commentary API key work? (one tiny call to each model)
+	$(PY) scripts/doctor.py --llm
 
 models:  ## download every model (~480 MB): this project's from its GitHub release, YOLO, pose, Kokoro voice
 	mkdir -p models

@@ -59,8 +59,9 @@ Models go in `models/` (not in git):
 The match video is not included (broadcast footage): use your own recording, and set the teams
 in `configs/matches/<video name>.yaml`. `make doctor` then says whether everything is in place.
 
-Optional keys in `.env` (gitignored): `LIGHTNING_API_KEY` (commentary and shot reading through
-Lightning AI) or `GEMINI_API_KEY`; without one, commentary uses templates.
+Optional key in `.env` (gitignored): `GEMINI_API_KEY` (free, from https://aistudio.google.com/apikey)
+for the commentary lines and the shot reading; `make llm-check` tests it. Without one, commentary
+uses templates. Other providers (Groq, OpenRouter, any OpenAI-compatible API): `configs/commentary.yaml`.
 
 ## Run it: one command
 

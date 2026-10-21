@@ -128,7 +128,7 @@ rotation, balls faced and bowler figures are independently tested.
 
 ### 3.6 Commentary, shot type, voice
 
-An LLM (Lightning AI / Gemini, any OpenAI-compatible API) sees only each ball's facts; every
+An LLM (Gemini's free tier; any OpenAI-compatible API) sees only each ball's facts; every
 line is checked - every number must be in the facts, only the players involved named, no
 boundary or wicket the facts lack, a word budget to fit the gap - and replaced by a template
 line if it fails. Shot type: asked for a shot name, vision models guessed ("sweep" for almost

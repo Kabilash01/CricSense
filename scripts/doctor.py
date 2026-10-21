@@ -1,6 +1,7 @@
 """Is this machine ready to run CricSense? Checks everything the pipeline needs, says what is missing.
 
     python scripts/doctor.py
+    python scripts/doctor.py --llm     # also make one tiny call to each commentary model: does the key work?
 
 Never prints a key's value - only whether it is set.
 """
@@ -8,7 +9,6 @@ Never prints a key's value - only whether it is set.
 from __future__ import annotations
 
 import importlib
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -31,18 +31,63 @@ DOWNLOADABLE = AUTO_DOWNLOAD | {"models/tts/kokoro-v1.0.int8.onnx", "models/tts/
 PACKAGES = ("cv2", "numpy", "torch", "ultralytics", "pytesseract", "pydantic", "yaml", "sqlalchemy", "fastapi", "kokoro_onnx")
 
 
-def env_keys() -> dict[str, bool]:
-    keys = {k: bool(os.environ.get(k)) for k in ("LIGHTNING_API_KEY", "GEMINI_API_KEY")}
-    env = ROOT / ".env"
-    if env.is_file():
-        for line in env.read_text().splitlines():
-            name, _, value = line.partition("=")
-            if name.strip() in keys and value.strip():
-                keys[name.strip()] = True
-    return keys
+def model_configs() -> list[tuple[str, object]]:
+    """The commentary models configs/commentary.yaml uses: (what for, LLMConfig)."""
+    import yaml
+
+    from cricsense.commentary.llm import LLMConfig
+
+    raw = yaml.safe_load((ROOT / "configs" / "commentary.yaml").read_text()) or {}
+    out = []
+    for part, why in (("llm", "commentary lines"), ("vlm", "shot reading")):
+        c = raw.get(part) or {}
+        if c.get("model") and (part != "vlm" or c.get("enabled")):
+            out.append((why, LLMConfig(provider=c.get("provider", "anthropic"), model=c["model"], base_url=c.get("base_url"), key_env=c.get("key_env"))))
+    return out
 
 
-def main() -> int:
+def key_name(cfg) -> str:
+    from cricsense.commentary.llm import DEFAULT_KEY_ENV
+
+    return cfg.key_env or DEFAULT_KEY_ENV.get(cfg.provider, "?")
+
+
+def live_check() -> int:
+    """One tiny call to each commentary model (the shot reader with a grey image): 0 if all answer."""
+    import cv2
+    import numpy as np
+    import requests
+
+    from cricsense.commentary.llm import api_key, complete
+
+    failed = 0
+    for why, cfg in model_configs():
+        label = f"{why}: {cfg.provider} {cfg.model}"
+        key = api_key(cfg, ROOT)
+        if not key:
+            print(f"  [MISS] {label} - no {key_name(cfg)} in .env")
+            failed += 1
+            continue
+        images = [cv2.imencode(".jpg", np.full((64, 64, 3), 90, np.uint8))[1].tobytes()] if why == "shot reading" else None
+        try:
+            reply = complete(cfg, key, "Answer only with the JSON asked for.", 'Return {"ok": true}', images)
+            print(f"  [ok  ] {label} - answered {reply.strip()[:40]!r}")
+        except requests.HTTPError as e:  # the API's own message says what is wrong (never contains the key)
+            print(f"  [FAIL] {label} - HTTP {e.response.status_code}: {e.response.text.strip()[:300]}")
+            failed += 1
+        except Exception as e:
+            print(f"  [FAIL] {label} - {type(e).__name__}: {str(e)[:300]}")
+            failed += 1
+    return failed
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if "--llm" in argv:
+        print("commentary models (one tiny call each)")
+        failed = live_check()
+        print("\nOK" if failed == 0 else f"\n{failed} model(s) not answering - commentary falls back to templates")
+        return 0 if failed == 0 else 1
     problems = 0
 
     def row(ok: bool, what: str, fix: str = "", required: bool = True) -> None:
@@ -82,9 +127,16 @@ def main() -> int:
         row(gpu, torch.cuda.get_device_name(0) if gpu else "CUDA GPU", "runs on CPU too, much slower", required=False)
     except Exception:
         row(False, "torch", "pip install -r requirements.txt")
-    print("API keys (optional: without one, commentary uses templates)")
-    for k, ok in env_keys().items():
-        row(ok, f"{k} {'set' if ok else 'not set'}", "add it to .env (never commit .env)", required=False)
+    print("API keys (optional: without one, commentary uses templates; test them with make llm-check)")
+    try:
+        from cricsense.commentary.llm import api_key
+
+        for why, cfg in model_configs():
+            ok = api_key(cfg, ROOT) is not None
+            row(ok, f"{key_name(cfg)} {'set' if ok else 'not set'} - {why} ({cfg.provider} {cfg.model})",
+                "add it to .env (never commit .env); see configs/commentary.yaml for where to get one", required=False)
+    except Exception as e:
+        row(False, f"configs/commentary.yaml: {e}", required=False)
     print("\nREADY" if problems == 0 else f"\n{problems} problem(s) - fix the MISS lines above")
     return 0 if problems == 0 else 1
 

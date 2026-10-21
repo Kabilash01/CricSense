@@ -17,12 +17,16 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+
+log = logging.getLogger("cricsense.commentary")
 
 WORDS_PER_S = 2.6  # a lively commentator; TTS runs at about this pace
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "fifty": 50, "hundred": 100, "century": 100}
@@ -78,13 +82,42 @@ def api_key(cfg: LLMConfig, root: Path) -> str | None:
 # ---- transport ---------------------------------------------------------------------------
 
 
+# Free tiers allow a few requests a minute (Gemini Flash: about 10). A "too many requests" (429)
+# or "overloaded" (503) reply is waited out and retried; a used-up daily quota fails at once.
+_RETRIES = 3
+_MAX_WAIT_S = 60.0
+
+
+def _post(url: str, *, headers: dict, json: dict, timeout: float) -> requests.Response:
+    attempt = 0
+    while True:
+        r = requests.post(url, headers=headers, json=json, timeout=timeout)
+        busy = r.status_code in (429, 503) and "PerDay" not in r.text
+        wait = _retry_wait(r, attempt) if busy else 0.0
+        if not busy or attempt == _RETRIES or wait > _MAX_WAIT_S:
+            r.raise_for_status()
+            return r
+        log.info("model API busy (HTTP %d), retrying in %.0f s", r.status_code, wait)
+        time.sleep(wait)
+        attempt += 1
+
+
+def _retry_wait(r: requests.Response, attempt: int) -> float:
+    """The wait the API asks for (Retry-After, or Gemini's retryDelay), else 5, 10, 20 s."""
+    after = r.headers.get("retry-after", "")
+    if re.fullmatch(r"\d+(\.\d+)?", after):
+        return float(after)
+    m = re.search(r'"retryDelay":\s*"(\d+(?:\.\d+)?)s"', r.text)
+    return float(m.group(1)) if m else 5.0 * 2**attempt
+
+
 def complete(cfg: LLMConfig, key: str, system: str, user: str, images: list[bytes] | None = None) -> str:
     """One model call; returns the text of the reply. images: JPEG bytes (for the VLM)."""
     images = images or []
     if cfg.provider == "anthropic":
         content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64.b64encode(i).decode()}} for i in images]
         content.append({"type": "text", "text": user})
-        r = requests.post(
+        r = _post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={"model": cfg.model, "max_tokens": 2000, "system": system, "messages": [{"role": "user", "content": content}]},
@@ -95,7 +128,7 @@ def complete(cfg: LLMConfig, key: str, system: str, user: str, images: list[byte
     if cfg.provider == "gemini":
         parts = [{"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(i).decode()}} for i in images]
         parts.append({"text": user})
-        r = requests.post(
+        r = _post(
             f"https://generativelanguage.googleapis.com/v1beta/models/{cfg.model}:generateContent",
             headers={"x-goog-api-key": key, "content-type": "application/json"},
             json={"system_instruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": parts}],
@@ -107,7 +140,7 @@ def complete(cfg: LLMConfig, key: str, system: str, user: str, images: list[byte
     if cfg.provider == "openai":
         content = [{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(i).decode()}} for i in images]
         content.append({"type": "text", "text": user})
-        r = requests.post(
+        r = _post(
             (cfg.base_url or "https://api.openai.com/v1").rstrip("/") + "/chat/completions",
             headers={"authorization": f"Bearer {key}", "content-type": "application/json"},
             json={"model": cfg.model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}]},

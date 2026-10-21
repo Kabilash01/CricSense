@@ -2,19 +2,20 @@
 engine: auto            # auto: the LLM when an API key is found, else templates | llm | template
 
 llm:                    # keys come from the environment or the gitignored .env, never from here
-  provider: openai      # anthropic | gemini | openai (any OpenAI-compatible endpoint: set base_url)
-  base_url: https://lightning.ai/api/v1   # Lightning AI model APIs (free credits)
-  key_env: LIGHTNING_API_KEY
-  model: google/gemini-3.1-flash-lite-preview
+  # Gemini API free tier: a key from https://aistudio.google.com/apikey as GEMINI_API_KEY in .env.
+  # Free-tier prompts may be used by Google to improve its products; about 10 requests a minute.
+  provider: gemini      # anthropic | gemini | openai (any OpenAI-compatible endpoint: set base_url)
+  model: gemini-3.5-flash-lite
   style: lively, warm, broadcast TV; varied phrasing; short sentences that read well aloud
-  # Gemini direct: provider gemini, model gemini-3.8-flash, key GEMINI_API_KEY (no base_url / key_env)
+  # Any OpenAI-compatible endpoint instead: provider openai, base_url, key_env, model - e.g.
+  #   Groq        base_url https://api.groq.com/openai/v1   key_env GROQ_API_KEY
+  #   OpenRouter  base_url https://openrouter.ai/api/v1     key_env OPENROUTER_API_KEY  (":free" models)
+  #   Lightning   base_url https://lightning.ai/api/v1      key_env LIGHTNING_API_KEY
 
 vlm:                    # shot type and direction from frames around bat contact
   enabled: true
-  provider: openai
-  base_url: https://lightning.ai/api/v1
-  key_env: LIGHTNING_API_KEY
-  model: google/gemini-3.5-flash   # vision needs a stronger model than flash-lite (it saw sweeps against 128 kph pace)
+  provider: gemini
+  model: gemini-3.8-flash   # vision needs a stronger model than flash-lite (it saw sweeps against 128 kph pace)
 
 max_words:              # caps; the time before the next ball can make them smaller
   ball: 22

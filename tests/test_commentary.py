@@ -107,3 +107,33 @@ def test_fact_check_rejects_how_a_batter_got_out():
     assert check_line("Axar is out! What a moment.", out, SQUAD, 30) is None
     for line in ("Axar is bowled! Through the gate!", "Caught! Axar has to go.", "Axar edges it and he's out!", "Plumb lbw, Axar is out!"):
         assert "how the batter was out" in check_line(line, out, SQUAD, 30), line
+
+
+class _Reply:
+    def __init__(self, status: int, text: str = "{}", headers: dict | None = None) -> None:
+        self.status_code, self.text, self.headers = status, text, headers or {}
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise llm.requests.HTTPError(f"HTTP {self.status_code}", response=self)
+
+
+def test_a_busy_free_tier_is_waited_out_but_a_spent_daily_quota_is_not(monkeypatch):
+    waits = []
+    monkeypatch.setattr(llm.time, "sleep", waits.append)
+
+    def answers(*replies):
+        it = iter(replies)
+        monkeypatch.setattr(llm.requests, "post", lambda *a, **k: next(it))
+
+    answers(_Reply(429, '{"error": {"details": [{"retryDelay": "7s"}]}}'), _Reply(503), _Reply(200, "ok"))
+    assert llm._post("u", headers={}, json={}, timeout=1).text == "ok"
+    assert waits == [7.0, 10.0]  # the API's own delay, then the second back-off step
+
+    waits.clear()
+    answers(_Reply(429, '{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}'))
+    try:
+        llm._post("u", headers={}, json={}, timeout=1)
+        raise AssertionError("a spent daily quota must fail")
+    except llm.requests.HTTPError:
+        assert waits == []

@@ -23,6 +23,9 @@ make test       # ~30 s; all must pass
 If `make doctor` says MISS: the line under it says how to fix it. Models are not in git: copy
 them into `models/` (README: Install). API keys go in `.env` (never commit it; never paste a key
 into a chat or a commit). Without a key the commentary uses templates - everything else works.
+The commentary uses the Gemini API's free tier: create a key at https://aistudio.google.com/apikey,
+add the line `GEMINI_API_KEY=<the key>` to `.env`, then `make llm-check` (one tiny call to each
+model: `ok`, or the API's own reason, e.g. a wrong key or the day's quota used up).
 
 The GPU: ball, players and pose use it. Another training job on the same GPU is fine but slower;
 if a step dies with "CUDA out of memory", run it again when the GPU is freer.
