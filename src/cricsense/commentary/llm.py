@@ -62,6 +62,7 @@ class LLMConfig:
     base_url: str | None = None  # openai-compatible endpoints
     key_env: str | None = None
     timeout_s: float = 60.0
+    max_images: int | None = None  # the provider's limit per request (Groq: 3); more frames go as one tiled picture
 
 
 DEFAULT_KEY_ENV = {"anthropic": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY", "openai": "OPENAI_API_KEY"}
@@ -83,16 +84,18 @@ def api_key(cfg: LLMConfig, root: Path) -> str | None:
 
 
 # Free tiers allow a few requests a minute (Gemini Flash: about 10). A "too many requests" (429)
-# or "overloaded" (503) reply is waited out and retried; a used-up daily quota fails at once.
+# or "overloaded" (503) reply is waited out and retried; one that waiting cannot fix - a used-up
+# daily quota (Gemini) or no credit left (OpenAI) - fails at once.
 _RETRIES = 3
 _MAX_WAIT_S = 60.0
+_FINAL = ("PerDay", "insufficient_quota", "credit_balance")
 
 
 def _post(url: str, *, headers: dict, json: dict, timeout: float) -> requests.Response:
     attempt = 0
     while True:
         r = requests.post(url, headers=headers, json=json, timeout=timeout)
-        busy = r.status_code in (429, 503) and "PerDay" not in r.text
+        busy = r.status_code in (429, 503) and not any(m in r.text for m in _FINAL)
         wait = _retry_wait(r, attempt) if busy else 0.0
         if not busy or attempt == _RETRIES or wait > _MAX_WAIT_S:
             r.raise_for_status()

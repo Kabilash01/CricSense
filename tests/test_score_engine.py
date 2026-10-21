@@ -72,3 +72,11 @@ def test_a_missed_ball_is_resynced_from_the_bar_and_flagged():
     out = score_innings(deliveries, [START, b1, b2, b3], 25.0)
     assert [s.source for s in out] == ["engine", "no_evidence", "resync"]
     assert out[2].runs == 56 and all(out[2].checks[k] for k in ("score", "wickets", "overs"))
+
+
+def test_a_score_only_dismissal_that_names_who_faced_is_still_not_applied_by_the_laws():
+    # the score after the wicket was read without the batters: runs off the bat unknown
+    after = bar(5, 50, 3, 61, (0, 0), (10, 9), strike="C", names=("C", "B"))
+    o = Outcome(START, after, "A", "X", 0, None, None, True, "legal", None)
+    out = score_innings([(0, 10, 0.4, o)], [START], 25.0)
+    assert out[0].source == "no_evidence" and "score only" in out[0].notes[0]

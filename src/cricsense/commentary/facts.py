@@ -61,6 +61,22 @@ def _name(s: str | None) -> str | None:
     return None if s is None else " ".join(w if w.lower() in ("de", "van", "du") else w.title() for w in s.split()).replace("De ", "de ", 1)
 
 
+def non_striker(st, striker: str | None) -> str | None:
+    """The striker's partner for this ball. The state is the one after the ball, where a single
+    has already swapped the ends, so: the other batter of the pair. If the striker is no longer
+    in it (out), the partner cannot be told from the new batter - None."""
+    pair = (st.striker, st.non_striker)
+    return next((n for n in pair if n and n != striker), None) if striker in pair else None
+
+
+def swing_of(batter, contact: bool, off_bat: int | None, evs: dict) -> str | None:
+    """The measured swing, unless the ball says otherwise: a ball the bat touched, scored off or hit
+    for six was not left (pose read Rohit's six off Starc as "left")."""
+    swing = batter.swing if batter else None
+    six = EventType.BOUNDARY in evs and evs[EventType.BOUNDARY].payload.get("kind") == "SIX"
+    return None if swing == "left" and (contact or (off_bat or 0) > 0 or six) else swing
+
+
 def build_facts(
     ball: BallDoc, events: EventsDoc, match: MatchDoc | None, sheet: MatchSheet | None, pose: PoseDoc | None = None
 ) -> list[BallFacts]:
@@ -110,7 +126,7 @@ def build_facts(
                 over=p.get("over"),
                 bowler=_name(p.get("bowler")),
                 striker=_name(striker),
-                non_striker=_name(st.non_striker) if known and st.non_striker else None,
+                non_striker=_name(non_striker(st, striker)) if known else None,
                 batting_team=team.display if team else None,
                 release_frame=d.release_frame,
                 contact_frame=contact.frame_id if contact else None,
@@ -137,7 +153,7 @@ def build_facts(
                 over_runs=over_runs,
                 bowler_figures=bowler_fig,
                 footwork=batter.footwork if (batter := (pose_by or {}).get(d.delivery_id)) else None,
-                swing=batter.swing if batter else None,
+                swing=swing_of(batter, contact is not None, q.get("off_bat") if known else None, evs),
             )
         )
         if known:

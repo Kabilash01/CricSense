@@ -42,7 +42,8 @@ def model_configs() -> list[tuple[str, object]]:
     for part, why in (("llm", "commentary lines"), ("vlm", "shot reading")):
         c = raw.get(part) or {}
         if c.get("model") and (part != "vlm" or c.get("enabled")):
-            out.append((why, LLMConfig(provider=c.get("provider", "anthropic"), model=c["model"], base_url=c.get("base_url"), key_env=c.get("key_env"))))
+            out.append((why, LLMConfig(provider=c.get("provider", "anthropic"), model=c["model"], base_url=c.get("base_url"), key_env=c.get("key_env"),
+                                           timeout_s=float(c.get("timeout_s", LLMConfig.timeout_s)))))
     return out
 
 

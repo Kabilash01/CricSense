@@ -134,6 +134,9 @@ boundary or wicket the facts lack, a word budget to fit the gap - and replaced b
 line if it fails. Shot type: asked for a shot name, vision models guessed ("sweep" for almost
 everything); asked only to describe posture, they were consistent, so the shot is named by
 textbook rules from the description, read three times and kept when two agree (5 of 8 shots).
+On a second match (2026-10-21) the free vision models misread known shots (a sweep as a flick),
+and the stronger free one allows 20 requests a day, so shot reading is off by default; the
+lines say only what was measured (`configs/commentary.yaml: vlm`).
 Speech: local Kokoro (int8 ONNX, ~0.4 GB, no key), pace set by the moment, mixed over the
 crowd with ducking.
 

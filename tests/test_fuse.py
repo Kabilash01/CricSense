@@ -113,3 +113,22 @@ def test_score_only_readings_give_runs_and_legal_or_extra():
     assert (six.kind, six.runs, six.boundary, six.striker, six.off_bat) == ("legal", 6, "SIX", None, None)
     extra = outcome([], 45.0, 90.0, track)
     assert (extra.kind, extra.runs) == ("extra", 1)
+
+
+def test_a_dismissal_seen_only_as_a_score_names_who_faced_from_the_bar_before_it():
+    from cricsense.fuse.outcome import score_track
+
+    def score_only(t, runs, wkts, balls):
+        return [ScoreboardReading(frame_id=int(x * 25), t=x, batters=[BatterLine(name=None, runs=None, balls=None, on_strike=False)] * 2,
+                                  runs=runs, wickets=wkts, legal_balls=balls, bowler=None, bowler_runs=None, bowler_legal_balls=None)
+                for x in (t, t + 0.5)]
+    # the full bar before the ball (Kohli on strike at 87-1), then only the score: 87-2 a ball later
+    full = [*seen(0, 87, 1, 53, (37, 27), (42, 20)), *seen(2, 87, 1, 53, (37, 27), (42, 20))]
+    rs = [*full, *score_only(40, 87, 2, 54)]
+    states = trusted_states(full, SQUAD)
+    out = outcome(states, 10.0, None, score_track(rs))
+    assert (out.wicket, out.striker, out.off_bat, out.bowler) == (True, "KOHLI", None, "SHAMSI")
+    # a full bar from an earlier score says nothing about who faced this ball
+    stale = trusted_states([*seen(0, 86, 1, 52, (36, 26), (42, 20)), *seen(2, 86, 1, 52, (36, 26), (42, 20))], SQUAD)
+    rs = [*score_only(5, 87, 1, 53), *score_only(40, 87, 2, 54)]
+    assert outcome(stale, 10.0, None, score_track(rs)).striker is None

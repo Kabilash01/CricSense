@@ -234,3 +234,45 @@ loading counted against the first frames. The report now gives when playback end
 starts after the models are loaded; it was 8.4 s at t = 0). Length and line: 4 shots, 1 bounce,
 right (4.82 m vs 4.79 m offline) but 146 s late; 3 without a bounce. Still not live: per shot,
 camera re-tracking and both ball models over the buffered frames take minutes.
+
+## A second match: Australia v India, Super 8 (2026-10-20)
+
+Whole-match scan with its own team sheet (`configs/matches/replay-super-8s-aus-vs-ind.yaml`):
+India 205-5 (121/121 ball counts) and Australia 181-7 (119/121), the official result. Two overs
+analysed end to end with `python main.py "<match video>" --overs 1:3 2:9`:
+- Starc's over (1:3): 6, 6, 4, 6, 0, wide, 6 = 29, as bowled; 48/48 checks. It failed calibration
+  at first - the main view appeared only in short bursts between replays - so automatic
+  calibration now samples every 0.5 s (frames with pitch colour, kept only if the creases fit).
+- Kuldeep's over (2:9): 1, 1, 0, 1, 1, wicket (Marsh, 87-2). The wicket ball had no outcome: the
+  overs field was read digits-only, so "9 OVERS" became 90 and the state was thrown away; the
+  field is now read with its letters and "OVERS" stripped.
+- After a wicket the bar shows the incoming batter, so a dismissal is often seen only as a score.
+  The batter who faced is now taken from the full bar before the ball when that bar showed the
+  same score (Marsh, 8.6); the score engine still treats it as score-only (runs off the bat unknown).
+- Calibration of a 7-minute over took 20-50 min (camera tracking: frames matching no reference are
+  compared with all of them). Not yet fixed.
+
+## Commentary on free APIs; shot reading off (2026-10-21)
+
+Lightning AI stopped answering (401, then 404). The commentary lines now use Gemini's free tier
+(`gemini-3.5-flash-lite`, one call per clip, ~4 s; `make llm-check` tests the key). 429/503 replies
+are retried after the wait the API asks for; a used-up daily quota or an empty balance fails at once.
+
+Shot reading was tried on the free vision models, on the 9 played shots of the two Super 8 overs:
+- `gemini-3.8-flash`: timed out (2 min) on a 64-px test image. `gemini-3.6-flash`: 22 s per call,
+  overloaded (503) during the run, and its free quota is 20 requests a day - one over, as each
+  shot is read three times.
+- `gemini-3.5-flash-lite`: "cover drive" for a push to a yorker, a horizontal-bat shot and a
+  crouched leg-side shot.
+- Groq `qwen/qwen3.8-27b` (4 frames tiled into one picture: it takes 3 images): three readings
+  agreed on 3 of 9 shots; Marsh's dismissal - a sweep, caught at deep backward square leg - read
+  as a flick all three times. Its description was half right (leg side, high finish, standing):
+  the naming rules have no standing slog-sweep either.
+Free-tier OpenAI does not exist (an account needs credit); Hugging Face gives free accounts no
+inference credits; GitHub Models is retired. So shot reading is off by default (`vlm.enabled`); the
+lines say only what was measured. To revisit: a hand-labelled answer key first, then a stronger
+model and naming rules for the shots the rules miss.
+
+The fact sheets had two bugs the LLM exposed: the non-striker was taken from the state after the
+ball (after a single the ends have swapped, so it named the striker), and a pose reading of "left"
+survived on a ball hit for six ("left alone for SIX!"). Both fixed, with tests.

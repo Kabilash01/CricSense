@@ -196,10 +196,16 @@ def outcome(
         return None
     # six off a legal ball: nothing but a six adds 6 (no byes or overthrows give exactly 6 here)
     boundary = "SIX" if kind == "legal" and d_runs == 6 else None
-    bowler = next((s.bowler for s in reversed(states) if s.t <= release_t), None)
+    last_full = next((s for s in reversed(states) if s.t <= release_t), None)
+    bowler = last_full.bowler if last_full else None
+    # who faced: the full bar's striker, if that bar showed this very score (not an earlier ball's -
+    # the strike may have changed since). After a wicket the bar shows the incoming batter, so a
+    # dismissal often has only the score after it.
+    same = last_full is not None and (last_full.runs, last_full.wickets, last_full.legal_balls) == (before.runs, before.wickets, before.legal_balls)
+    striker = last_full.striker[0] if same and last_full.striker else None
     core = (after.runs, after.wickets, after.legal_balls)
     settled = min(s.t for s in after_candidates if (s.runs, s.wickets, s.legal_balls) == core)
-    return Outcome(before, after, None, bowler, d_runs, None, None, d_wkts > 0, kind, boundary, settled)
+    return Outcome(before, after, striker, bowler, d_runs, None, None, d_wkts > 0, kind, boundary, settled)
 
 
 def _full_outcome(states: list[ScoreState], release_t: float, next_release_t: float | None) -> Outcome | None:

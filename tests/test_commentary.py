@@ -130,10 +130,62 @@ def test_a_busy_free_tier_is_waited_out_but_a_spent_daily_quota_is_not(monkeypat
     assert llm._post("u", headers={}, json={}, timeout=1).text == "ok"
     assert waits == [7.0, 10.0]  # the API's own delay, then the second back-off step
 
-    waits.clear()
-    answers(_Reply(429, '{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}'))
-    try:
-        llm._post("u", headers={}, json={}, timeout=1)
-        raise AssertionError("a spent daily quota must fail")
-    except llm.requests.HTTPError:
-        assert waits == []
+    for final in ('{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}',  # Gemini: the day's quota
+                  '{"error": {"type": "insufficient_quota", "code": "credit_balance_exhausted"}}'):  # OpenAI: no credit
+        waits.clear()
+        answers(_Reply(429, final))
+        try:
+            llm._post("u", headers={}, json={}, timeout=1)
+            raise AssertionError("waiting cannot fix this: it must fail at once")
+        except llm.requests.HTTPError:
+            assert waits == []
+
+
+def test_the_non_striker_is_the_strikers_partner_not_the_state_after_a_single():
+    from types import SimpleNamespace
+
+    from cricsense.commentary.facts import non_striker
+
+    after_a_single = SimpleNamespace(striker="HEAD", non_striker="MARSH")  # Marsh faced and ran: ends swapped
+    assert non_striker(after_a_single, "MARSH") == "HEAD"
+    assert non_striker(SimpleNamespace(striker="MARSH", non_striker="HEAD"), "MARSH") == "HEAD"  # a dot ball
+    assert non_striker(SimpleNamespace(striker="MAXWELL", non_striker="HEAD"), "MARSH") is None  # Marsh out
+
+
+def test_a_ball_hit_for_six_is_never_said_to_be_left():
+    from types import SimpleNamespace
+
+    from cricsense.commentary.facts import swing_of
+    from cricsense.schema import EventType
+
+    left = SimpleNamespace(swing="left")
+    six = {EventType.BOUNDARY: SimpleNamespace(payload={"kind": "SIX"})}
+    assert swing_of(left, False, None, six) is None  # score only, but a six
+    assert swing_of(left, True, 0, {}) is None  # the bat touched it
+    assert swing_of(left, False, 1, {}) is None  # runs off the bat
+    assert swing_of(left, False, 0, {}) == "left"  # nothing says otherwise
+    assert swing_of(SimpleNamespace(swing="played"), False, 0, {}) == "played"
+
+
+def test_more_frames_than_the_provider_takes_go_as_one_tiled_picture(tmp_path, monkeypatch):
+    import cv2
+    import numpy as np
+
+    from cricsense.commentary import vlm
+
+    frames = [cv2.imencode(".jpg", np.full((h, 300, 3), 40 * i, np.uint8))[1].tobytes() for i, h in enumerate((300, 300, 300, 170))]
+    sent = []
+
+    def fake(cfg, key, system, user, images=None):
+        sent.append((user, images))
+        return '{"stance": "upright", "foot": "front", "bat_finish": "high", "ball_side": "off", "clear": 0.9}'
+
+    monkeypatch.setattr(vlm, "complete", fake)
+    vlm.read_shot(LLMConfig("openai", "m", max_images=3), "k", frames, Cache(tmp_path / "c.json"))
+    user, images = sent[0]
+    assert len(images) == 1 and user.endswith(vlm.TILED)
+    grid = cv2.imdecode(np.frombuffer(images[0], np.uint8), cv2.IMREAD_COLOR)
+    assert grid.shape[:2] == (2 * 768, 2 * 768)  # 2x2 cells, time order left to right
+    sent.clear()
+    vlm.read_shot(LLMConfig("openai", "m"), "k", frames, Cache(tmp_path / "d.json"))
+    assert len(sent[0][1]) == 4 and sent[0][0] == vlm.PROMPT  # no limit: the frames as they are

@@ -13,9 +13,16 @@ llm:                    # keys come from the environment or the gitignored .env,
   #   Lightning   base_url https://lightning.ai/api/v1      key_env LIGHTNING_API_KEY
 
 vlm:                    # shot type and direction from frames around bat contact
-  enabled: true
-  provider: gemini
-  model: gemini-3.8-flash   # vision needs a stronger model than flash-lite (it saw sweeps against 128 kph pace)
+  # Off: no free model read shots reliably (2026-10-21, docs/decisions.md). Gemini Flash-Lite called
+  # three different swings "cover drive"; Groq's qwen3.8-27b read Marsh's sweep as a flick and
+  # agreed with itself on 3 of 9 shots; gemini-3.6-flash allows 20 requests a day (one over).
+  enabled: false
+  provider: openai      # to try it again: enabled true (Groq: a free GROQ_API_KEY in .env)
+  base_url: https://api.groq.com/openai/v1
+  key_env: GROQ_API_KEY
+  model: qwen/qwen3.8-27b
+  max_images: 3         # Groq takes at most 3 images per request: the 4 frames go as one 2x2 picture
+  timeout_s: 120        # its free tier allows ~3 image calls a minute: about a minute per shot
 
 max_words:              # caps; the time before the next ball can make them smaller
   ball: 22

@@ -30,6 +30,9 @@ Return JSON only:
  "foot": "front" | "back" | "unclear", "bat_finish": "high" | "low" | "unclear",
  "ball_side": "off" | "leg" | "straight" | "unclear", "clear": 0.0-1.0 (how clearly the frames show all this)}"""
 
+# For a provider that takes fewer images per request than we send, the frames go as one picture.
+TILED = "\nThe frames are tiled into one picture, numbered in time order: left to right, then top to bottom."
+
 MIN_CLEAR = 0.5
 
 
@@ -52,6 +55,21 @@ def name_shot(o: dict) -> str | None:
 
 
 CROP = 640  # side of the square crop around the batter, in the frame's pixels
+
+
+def tile(frames: list[bytes], cell: int = 768) -> bytes:
+    """The frames as one JPEG, two to a row in time order, each numbered and fitted into its cell."""
+    imgs = [cv2.imdecode(np.frombuffer(f, np.uint8), cv2.IMREAD_COLOR) for f in frames]
+    cols = 2
+    grid = np.zeros((-(-len(imgs) // cols) * cell, cols * cell, 3), np.uint8)
+    for i, im in enumerate(imgs):
+        scale = cell / max(im.shape[:2])
+        im = cv2.resize(im, (int(im.shape[1] * scale), int(im.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+        row, col = divmod(i, cols)
+        y0, x0 = row * cell + (cell - im.shape[0]) // 2, col * cell + (cell - im.shape[1]) // 2
+        grid[y0 : y0 + im.shape[0], x0 : x0 + im.shape[1]] = im
+        cv2.putText(grid, str(i + 1), (col * cell + 12, row * cell + 52), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 255, 255), 4)
+    return cv2.imencode(".jpg", grid, [cv2.IMWRITE_JPEG_QUALITY, 88])[1].tobytes()
 
 
 def contact_frames(video, centre: int, striker_box=None) -> list[bytes]:
@@ -94,12 +112,15 @@ def read_shot(cfg: LLMConfig, key: str, frames: list[bytes], cache: Cache, votes
     if not frames:
         return None
     digest = [np.frombuffer(f, np.uint8).sum() % 1_000_003 for f in frames]
+    prompt = PROMPT
+    if cfg.max_images is not None and len(frames) > cfg.max_images:
+        frames, prompt = [tile(frames)], PROMPT + TILED
     readings = []
     for attempt in range(votes):
-        k = cache.key("vlm-posture", cfg.provider, cfg.model, PROMPT, digest, attempt)
+        k = cache.key("vlm-posture", cfg.provider, cfg.model, prompt, digest, attempt)
         reply = cache.get(k)
         if reply is None:
-            reply = complete(cfg, key, "You describe cricket video frames. Answer only with the JSON asked for.", PROMPT, frames)
+            reply = complete(cfg, key, "You describe cricket video frames. Answer only with the JSON asked for.", prompt, frames)
             cache.put(k, reply)
         try:
             o = parse_json(reply)

@@ -31,6 +31,8 @@ def _llm_cfg(raw: dict) -> LLMConfig:
         style=raw.get("style", LLMConfig.style),
         base_url=raw.get("base_url"),
         key_env=raw.get("key_env"),
+        timeout_s=float(raw.get("timeout_s", LLMConfig.timeout_s)),
+        max_images=raw.get("max_images"),
     )
 
 

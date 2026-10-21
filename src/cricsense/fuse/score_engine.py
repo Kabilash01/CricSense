@@ -169,7 +169,7 @@ def score_innings(
         if o is None:
             out.append(_snapshot(engine, did, release_frame, fps, "no_evidence", {}, ["no clean score-bar change for this ball"]))
             continue
-        if o.striker is None:  # the score alone: not enough for the laws (who faced, off the bat)
+        if o.off_bat is None:  # the score alone: not enough for the laws (runs off the bat; maybe who faced)
             out.append(_snapshot(engine, did, release_frame, fps, "no_evidence", {}, [f"score only: {o.kind}, {o.runs} run(s); batters not shown"]))
             continue
         source = "engine"
