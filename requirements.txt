@@ -2,4 +2,4 @@
 #
 # torch from PyPI (2.14, CUDA 13.0 build) runs on the RTX 50-series (Blackwell); verified on an
 # RTX 5060 Laptop GPU. Older torch releases need the CUDA 12.8 wheels from download.pytorch.org.
--e .[ml,ocr,render,commentary,voice,store,api,dev]
+-e .[ml,ocr,render,commentary,voice,clean-audio,store,api,dev]

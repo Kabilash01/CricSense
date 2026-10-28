@@ -47,14 +47,16 @@ sudo pacman -S tesseract ffmpeg postgresql   # or your distribution's packages
 
 Models go in `models/` (not in git):
 
-`make models` downloads all of them (~480 MB) and checks them:
+`make models` downloads all of them (~560 MB) and checks them:
 
 - the three trained for this project - `ball_best.pt` (finds the deliveries), `ball_ft.pt`
   (tracks the ball) and `bat_best.pt` (bat contact) - from the repository's
   [models-v1 release](https://github.com/Kabilash01/CricSense/releases/tag/models-v1). The
   repository is private: you need access to it and the GitHub CLI logged in (`gh auth login`);
 - `yolov8m.pt` (players) and `yolo11x-pose.pt` (pose), which also download by themselves on
-  first use, and the Kokoro voice (`tts/kokoro-v1.0.int8.onnx`, `tts/voices-v1.0.bin`).
+  first use, and the Kokoro voice (`tts/kokoro-v1.0.int8.onnx`, `tts/voices-v1.0.bin`);
+- Demucs (`demucs/955717e8-8726e21a.th`), which takes the broadcast's own commentators out of the
+  stadium sound under ours (optional: without it both commentaries are heard).
 
 The match video is not included (broadcast footage): use your own recording, and set the teams
 in `configs/matches/<video name>.yaml`. `make doctor` then says whether everything is in place.

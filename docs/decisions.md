@@ -276,3 +276,23 @@ model and naming rules for the shots the rules miss.
 The fact sheets had two bugs the LLM exposed: the non-striker was taken from the state after the
 ball (after a single the ends have swapped, so it named the striker), and a pose reading of "left"
 survived on a ball hit for six ("left alone for SIX!"). Both fixed, with tests.
+
+## The broadcast's commentators out from under ours (2026-10-24)
+
+Our commentary was mixed over the broadcast sound, ducked while our voice spoke; between our lines
+the TV commentators were heard, two commentaries over one picture. Now the stadium sound is first
+split by Demucs (htdemucs, MIT licence, local, ~80 MB) into voices and the rest, and only the rest
+(crowd, bat, stumps) goes under our commentary (`broadcast_voices: remove`; `keep` and `mute` as
+before / none). The stereo trick (the commentators sit in the middle: keep only L-R) was measured
+first: L and R correlate 0.76 and the side signal is 9 dB below the middle - it would leave a thin,
+phasey crowd, and any off-centre voice in.
+Measured on 40 s of Bumrah's over (the voices stem of a second Demucs pass, before and after): the
+commentators at -23.6 dB and speaking in 24 of the 40 s in the broadcast; after, -52 dB and 0.4 s,
+with the rest of the sound 3 dB lower. 5 s on the GPU for the 40 s. On a whole over (final_0051_6min)
+one pass was not enough: voice was still found in 25 s of the 290 s between our lines, only 7-14 dB
+under the broadcast's (no bass there: commentators, not stadium music). A second pass over the
+result left none, with the crowd 0.4 dB lower, for 16 s more per 6 minutes - so two passes. The
+rendered overlay's sound matches the crowd track exactly (correlation 1.00), not the broadcast's.
+The model is loaded from `models/demucs` (`make models`): demucs 4.1 fetches it from the Hugging
+Face hub by default, which stalled at 0 bytes here, while Meta's server (the file the hub copies)
+worked.

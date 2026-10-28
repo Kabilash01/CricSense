@@ -138,7 +138,8 @@ On a second match (2026-10-21) the free vision models misread known shots (a swe
 and the stronger free one allows 20 requests a day, so shot reading is off by default; the
 lines say only what was measured (`configs/commentary.yaml: vlm`).
 Speech: local Kokoro (int8 ONNX, ~0.4 GB, no key), pace set by the moment, mixed over the
-crowd with ducking.
+stadium sound with the broadcast's own commentators taken out (Demucs, local), the crowd
+ducked under each line.
 
 ### 3.7 Overlay
 

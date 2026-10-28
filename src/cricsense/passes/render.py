@@ -55,6 +55,29 @@ def audio_source(cfg: Config, video_id: str, video: Path) -> tuple[Path, float] 
     return None
 
 
+def under_commentary(cfg: Config, video_id: str, video: Path, duration_s: float) -> tuple[Path, float] | None:
+    """The stadium sound to mix our commentary over (configs/commentary.yaml broadcast_voices):
+    without the broadcast's commentators (remove), as broadcast (keep), or none (mute)."""
+    audio = audio_source(cfg, video_id, video)
+    mode = cfg.commentary.get("broadcast_voices", "keep")
+    if audio is None or mode == "keep":
+        return audio
+    if mode == "mute":
+        return None
+    if mode != "remove":
+        raise ValueError(f"broadcast_voices: {mode!r} - use remove, keep or mute")
+    try:
+        from cricsense.render.crowd import without_voices
+
+        out = cfg.output_dir_for(video_id) / "crowd.wav"
+        return without_voices(audio[0], audio[1], duration_s, out, cfg.root / "models" / "demucs", cfg.device), 0.0
+    except ImportError:
+        log.warning("demucs is not installed (pip install -e \".[clean-audio]\"): the broadcast's commentators stay in")
+    except FileNotFoundError as e:
+        log.warning("%s: the broadcast's commentators stay in", e)
+    return audio
+
+
 class _Writer:
     def __init__(
         self,
@@ -194,7 +217,8 @@ def run_render(
     end = ball.video.n_frames if end_s is None else min(ball.video.n_frames, int(round(end_s * fps)))
     out_path = out_dir / out_name
     t0 = time.perf_counter()
-    writer = _Writer(out_path, fps, size, audio_source(cfg, video_id, video), start / fps, voice_wav if use_voice else None)
+    audio = under_commentary(cfg, video_id, video, ball.video.n_frames / fps) if use_voice else audio_source(cfg, video_id, video)
+    writer = _Writer(out_path, fps, size, audio, start / fps, voice_wav if use_voice else None)
     n = 0
     try:
         with VideoReader(video, start=start, end=end) as reader:

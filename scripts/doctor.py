@@ -23,11 +23,12 @@ MODELS = {  # file: what needs it
     "models/yolo11x-pose.pt": "pose",
     "models/tts/kokoro-v1.0.int8.onnx": "voice (local speech)",
     "models/tts/voices-v1.0.bin": "voice (local speech)",
+    "models/demucs/955717e8-8726e21a.th": "render - takes the broadcast's commentators out (optional)",
 }
-OPTIONAL_MODELS = {"models/ball_ft.pt"}
+OPTIONAL_MODELS = {"models/ball_ft.pt", "models/demucs/955717e8-8726e21a.th"}
 # Ultralytics downloads these by name on first use; `make models` fetches them (and Kokoro) now
 AUTO_DOWNLOAD = {"models/yolov8m.pt", "models/yolo11x-pose.pt"}
-DOWNLOADABLE = AUTO_DOWNLOAD | {"models/tts/kokoro-v1.0.int8.onnx", "models/tts/voices-v1.0.bin"}
+DOWNLOADABLE = AUTO_DOWNLOAD | {"models/tts/kokoro-v1.0.int8.onnx", "models/tts/voices-v1.0.bin", "models/demucs/955717e8-8726e21a.th"}
 PACKAGES = ("cv2", "numpy", "torch", "ultralytics", "pytesseract", "pydantic", "yaml", "sqlalchemy", "fastapi", "kokoro_onnx")
 
 
@@ -108,13 +109,18 @@ def main(argv: list[str] | None = None) -> int:
             row(True, pkg)
         except Exception:
             row(False, pkg, "pip install -r requirements.txt  (in the conda env 'ball')")
+    try:
+        importlib.import_module("demucs")
+        row(True, "demucs  (takes the broadcast's commentators out from under ours)")
+    except Exception:
+        row(False, "demucs  (takes the broadcast's commentators out from under ours)", 'pip install -e ".[clean-audio]"', required=False)
     print("models")
     for path, why in MODELS.items():
         here = (ROOT / path).is_file()
         if path in AUTO_DOWNLOAD and not here:
             row(False, f"{path}  ({why}) - downloads by itself on first use", "or now: make models", required=False)
         elif path in DOWNLOADABLE:
-            row(here, f"{path}  ({why})", "make models")
+            row(here, f"{path}  ({why})", "make models", path not in OPTIONAL_MODELS)
         else:  # trained for this project: not downloadable
             row(here, f"{path}  ({why})", "make models  (this project's GitHub release models-v1; needs gh auth login)", path not in OPTIONAL_MODELS)
     print("configs")

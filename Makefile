@@ -21,12 +21,15 @@ doctor:  ## is this machine ready? (programs, packages, models, GPU, keys)
 llm-check:  ## does the commentary API key work? (one tiny call to each model)
 	$(PY) scripts/doctor.py --llm
 
-models:  ## download every model (~480 MB): this project's from its GitHub release, YOLO, pose, Kokoro voice
+models:  ## download every model (~560 MB): this project's from its GitHub release, YOLO, pose, Kokoro voice, Demucs
 	mkdir -p models
 	cd models && gh release download models-v1 --repo Kabilash01/CricSense --skip-existing && sha256sum -c SHA256SUMS
 	$(PY) -c "from ultralytics import YOLO; [YOLO(m) for m in ('models/yolov8m.pt', 'models/yolo11x-pose.pt')]"
 	mkdir -p models/tts
 	cd models/tts && for f in kokoro-v1.0.int8.onnx voices-v1.0.bin; do test -f $$f || curl -fL -o $$f https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$$f; done
+	mkdir -p models/demucs
+	cd models/demucs && f=955717e8-8726e21a.th && test -f $$f || (for i in 1 2 3 4 5; do curl -fL -C - -o $$f.part https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/$$f && break; done; \
+	  sha256sum $$f.part | grep -q '^8726e21a' && mv $$f.part $$f)  # the name ends with its sha256's start
 
 say:  ## hear the commentary voice:  make say TEXT="Four!"  (ARGS="--style big --voice bm_lewis")
 	$(PY) scripts/say.py $(if $(TEXT),"$(TEXT)") $(ARGS)

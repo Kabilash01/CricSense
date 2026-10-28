@@ -37,3 +37,10 @@ tts:                    # spoken commentary (cricsense voice)
   # f5 (a cloned voice - only someone who agreed): engine f5, plus
   #   ref_audio: voices/<name>.wav     # 8-15 s of clean speech; voices/ is not committed
   #   ref_text: "exactly the words said in that recording"
+
+# The stadium sound under our commentary (render, when the clip has been voiced):
+#   remove: the broadcast's own commentators taken out, the crowd and bat kept (Demucs, local;
+#           pip install -e ".[clean-audio]"; its model, ~80 MB, comes with make models)
+#   keep:   as broadcast, ducked while our commentator speaks (both commentaries are heard)
+#   mute:   no stadium sound, our commentary alone
+broadcast_voices: remove

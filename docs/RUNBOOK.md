@@ -114,6 +114,11 @@ part only: `python -m cricsense scoreboard --video "<match>" --start 6500 --end 
 2. Edit `configs/demo.yaml`: the title cards' text and the clips, in order.
 3. `make demo` - writes `outputs/demo/cricsense_demo.mp4` (~5 min for ~15 min of video).
 
+The broadcast's own commentators are taken out of the stadium sound under ours, keeping the crowd
+(`broadcast_voices: remove` in `configs/commentary.yaml`; `keep` mixes both, `mute` leaves our
+commentary alone). It is done when a clip is rendered, so after changing it re-render each clip -
+`python -m cricsense run --video data/<clip>.mp4 --voice --fresh render` - then `make demo`.
+
 ---
 
 ## 6. A new match from the same broadcaster (ICC 2024 graphics)

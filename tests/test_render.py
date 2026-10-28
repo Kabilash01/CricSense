@@ -100,3 +100,25 @@ def test_summary_png_lists_every_delivery():
     rows = [("12.1", "Nortje → Kohli", "full 4.0 m", "10 cm R", "140 km/h radar", "SIX")]
     img = summary_png([MapPoint("12.1", 4.0, 0.1, "full", True)], rows, "test")
     assert img.ndim == 3 and img.shape[2] == 3 and img.shape[1] > img.shape[0]
+
+
+def test_the_sound_under_our_commentary_follows_broadcast_voices(monkeypatch, tmp_path):
+    from dataclasses import replace
+
+    from cricsense.config import load_config
+    from cricsense.passes import render
+    from cricsense.render import crowd
+
+    src = (tmp_path / "match.mp4", 120.0)
+    calls = []
+    monkeypatch.setattr(render, "audio_source", lambda *a: src)
+    monkeypatch.setattr(crowd, "without_voices", lambda s, off, dur, out, model_dir, device: calls.append((s, off, dur)) or out)
+    cfg = load_config()
+
+    def under(mode: str):
+        return render.under_commentary(replace(cfg, commentary={"broadcast_voices": mode}), "clip", tmp_path / "clip.mp4", 60.0)
+
+    assert under("keep") == src  # as broadcast: both commentaries heard
+    assert under("mute") is None  # our commentary alone
+    out, offset = under("remove")  # the clip's span of the broadcast, without its commentators
+    assert out.name == "crowd.wav" and offset == 0.0 and calls == [(src[0], 120.0, 60.0)]
