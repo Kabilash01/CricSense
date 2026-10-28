@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import subprocess
 import threading
 import time
 from collections import deque
@@ -55,6 +56,7 @@ class LiveState:
     score: str | None = None  # "93-3 (12.0)"
     batters: list = field(default_factory=list)
     bowler: str | None = None
+    next_ball: str | None = None  # "12.3": the over and ball about to be bowled
     last_ball: dict | None = None
     last_ball_wall: float = -1e9
     last_delivery: dict | None = None
@@ -143,6 +145,7 @@ class ScoreWorker(Worker):
             self.state.score = f"{last.runs}-{last.wickets} ({last.legal_balls // 6}.{last.legal_balls % 6})"
             self.state.batters = [(b[0], b[1], b[2], b[3]) for b in last.batters]
             self.state.bowler = last.bowler
+            self.state.next_ball = f"{last.legal_balls // 6}.{last.legal_balls % 6 + 1}"
         # each settled state after the last one reported: that ball's outcome, now
         fresh = [st for st in states if self.last is None or st.t > self.last.t]
         prev = self.last
@@ -171,6 +174,91 @@ class ScoreWorker(Worker):
             self.state.emit(LiveEvent("BALL", frame_id, b.t, time.perf_counter() - self.t0, ball))
         if fresh:
             self.last = fresh[-1]
+
+
+class FlowCamera:
+    """A frame's image -> pitch homography, fast enough for live: the last one carried by the
+    camera's motion since it (optical flow on a half-size copy, ~10 ms), refreshed by a full match
+    against the reference views (CameraTracker, 40-330 ms) every `full_every` frames. A refresh can
+    fail when the camera has zoomed in on the batter (too little of the reference view left): then
+    the flow goes on carrying it, for up to `max_flow` frames since the last full match. After a
+    failed match with nothing to carry (an outfield view, a replay) it waits `miss_wait` frames
+    before trying again. Measured on Bumrah's over against the offline per-frame calibration, where
+    players stand: 0.25 m median, 0.64 m at the 90th percentile; offline 237 frames, this 253."""
+
+    SCALE = 0.5
+
+    def __init__(self, tracker, occluders, full_every: int = 6, max_flow: int = 60, miss_wait: int = 4) -> None:
+        self.tracker, self.occluders = tracker, list(occluders)
+        self.full_every, self.max_flow, self.miss_wait = full_every, max_flow, miss_wait
+        self.mask: np.ndarray | None = None
+        self.counts = {"full_matches": 0, "full_failed": 0, "flow_failed": 0}
+        self.reset()
+
+    def reset(self) -> None:
+        """A cut: nothing carries over."""
+        self.tracker.reset()
+        self.H: np.ndarray | None = None
+        self.prev: np.ndarray | None = None
+        self.since_full = 0  # frames since the last successful full match
+        self.since_try = 0  # frames since the last full match tried
+        self.wait = 0
+
+    def __call__(self, image: np.ndarray, in_view: bool = True) -> np.ndarray | None:
+        """This frame's homography, or None. in_view=False (no pitch on screen): None, but the
+        frame is still remembered for the next one's flow."""
+        small = cv2.cvtColor(cv2.resize(image, None, fx=self.SCALE, fy=self.SCALE, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+        prev, self.prev = self.prev, small
+        self.H = self._homography(image, small, prev) if in_view else None
+        return self.H
+
+    def _homography(self, image: np.ndarray, small: np.ndarray, prev: np.ndarray | None) -> np.ndarray | None:
+        flow_H = None
+        if self.H is not None and prev is not None:
+            M = self._flow(prev, small)
+            if M is not None:
+                flow_H = self.H @ np.linalg.inv(M)
+            else:
+                self.counts["flow_failed"] += 1
+        self.since_full += 1
+        self.since_try += 1
+        if flow_H is not None and self.since_try < self.full_every:
+            return flow_H
+        if flow_H is None and self.wait > 0:
+            self.wait -= 1
+            return None
+        est = self.tracker.estimate(image)
+        self.counts["full_matches"] += 1
+        self.since_try = 0  # failed while the flow carries on: the next try is full_every frames on
+        if est.homography is not None:
+            self.since_full = 0
+            return est.homography.H
+        self.counts["full_failed"] += 1
+        if flow_H is not None and self.since_full < self.max_flow:
+            return flow_H
+        self.wait = self.miss_wait
+        return None
+
+    def _flow(self, prev: np.ndarray, cur: np.ndarray) -> np.ndarray | None:
+        """Previous -> current frame homography in full-size pixels, from tracked corners (the
+        broadcast's fixed graphics masked out: they would pull it toward no motion)."""
+        if self.mask is None:
+            h, w = prev.shape
+            self.mask = np.full((h, w), 255, np.uint8)
+            for x0, y0, x1, y1 in self.occluders:
+                self.mask[int(y0 * h) : int(y1 * h), int(x0 * w) : int(x1 * w)] = 0
+        p0 = cv2.goodFeaturesToTrack(prev, 400, 0.01, 8, mask=self.mask)
+        if p0 is None or len(p0) < 30:
+            return None
+        p1, ok, _ = cv2.calcOpticalFlowPyrLK(prev, cur, p0, None, winSize=(21, 21), maxLevel=3)
+        ok = ok.ravel() == 1
+        if ok.sum() < 30:
+            return None
+        M, inliers = cv2.findHomography(p0[ok], p1[ok], cv2.RANSAC, 2.0)
+        if M is None or inliers.sum() < 25:
+            return None
+        S = np.diag([1 / self.SCALE, 1 / self.SCALE, 1.0])
+        return S @ M @ np.linalg.inv(S)
 
 
 class ViewBallWorker(Worker):
@@ -212,6 +300,7 @@ class ViewBallWorker(Worker):
         self.prev_thumb = None
         self.counts = {"main_view_frames": 0, "shots": 0, "short_shot": 0, "not_buffered": 0, "no_delivery": 0, "no_bounce": 0, "bounces": 0}
         self.misses = 0
+        self.gate = None  # called between batches of a shot's processing: may wait for a quieter moment
 
     def handle(self, frame_id: int, t: float, image: np.ndarray) -> None:
         """Every few frames: has a main-view shot started (one direct match to a reference view
@@ -272,39 +361,60 @@ class ViewBallWorker(Worker):
             torch.cuda.empty_cache()  # whatever the last shot left behind
         except Exception:
             pass
-        tracker = self.new_tracker()
-        calibrated = []
+        # The shot in order: the camera (flow, with a full match every few frames - matching every
+        # frame took 330 ms a frame during a zoom), then the finder model in batches. The delivery
+        # is in the first seconds (run-up, release, bounce, bat): once a confirmed bounce is
+        # AFTER_BOUNCE frames behind, the rest of the shot is left. The fine-tuned model then runs
+        # only from the release to there.
+        camera = FlowCamera(self.new_tracker(), self.camera_opts.overlay_mask, full_every=SHOT_FULL_EVERY)
+        calibrated, geo, pending = [], {}, []
+        cands: dict[str, list] = {"finder": [], "tracker": []}
+
+        def detect(name: str, model, batch: list) -> None:
+            if self.gate is not None:
+                self.gate()
+            for (f, img, _), r in zip(batch, self._detect(model, [img for _, img, _ in batch])):
+                cands[name] += [
+                    Candidate(f, f / self.fps, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, float(c))
+                    for b, c in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist())
+                    if (b[1] + b[3]) / 2 < 0.85 * img.shape[0] and float(c) >= 0.15
+                ]
+
         for f, img in frames:
-            est = tracker.estimate(img)
-            if est.homography is not None:
-                calibrated.append((f, img, est.homography.H))
+            H = camera(img)
+            if H is None:
+                continue
+            try:
+                P = CameraPose.from_homography(H, img.shape[1::-1]).P
+            except Exception:
+                P = None
+            geo[f] = FrameGeometry(H, P)
+            calibrated.append((f, img, H))
+            pending.append((f, img, H))
+            if len(pending) == BATCH:
+                detect("finder", self.finder, pending)
+                pending = []
+                if len(calibrated) % EARLY_CHECK == 0:
+                    early = find_delivery(cands["finder"], geo, self.fps)
+                    if early and early.bounce and early.bounce.confirmed and f - early.bounce.t * self.fps >= AFTER_BOUNCE:
+                        self.counts["stopped_early"] = self.counts.get("stopped_early", 0) + 1
+                        break
+        if pending:
+            detect("finder", self.finder, pending)
         if len(calibrated) < 8:
             self.counts["short_shot"] += 1
             return
         self.counts["main_view_frames"] += len(calibrated)
-        geo, cands = {}, []
-        size = calibrated[0][1].shape[1::-1]
-        for f, _, H in calibrated:
-            try:
-                P = CameraPose.from_homography(H, size).P
-            except Exception:
-                P = None
-            geo[f] = FrameGeometry(H, P)
-        found = {}
-        for name, model in (("finder", self.finder), ("tracker", self.model)):
-            cands = []
-            for k in range(0, len(calibrated), BATCH):
-                batch = calibrated[k : k + BATCH]
-                for (f, img, _), r in zip(batch, self._detect(model, [img for _, img, _ in batch])):
-                    cands += [
-                        Candidate(f, f / self.fps, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2, float(c))
-                        for b, c in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist())
-                        if (b[1] + b[3]) / 2 < 0.85 * img.shape[0] and float(c) >= 0.15
-                    ]
-            found[name] = find_delivery(cands, geo, self.fps)
-            if self.model is self.finder:
-                found["tracker"] = found["finder"]
-                break
+        found = {"finder": find_delivery(cands["finder"], geo, self.fps)}
+        if self.model is self.finder:
+            found["tracker"] = found["finder"]
+        else:
+            d = found["finder"]
+            lo, hi = (d.release_frame - 5, d.bounce.t * self.fps + AFTER_BOUNCE) if d and d.bounce else (-1, 1e9)
+            window = [c for c in calibrated if lo <= c[0] <= hi]
+            for k in range(0, len(window), BATCH):
+                detect("tracker", self.model, window[k : k + BATCH])
+            found["tracker"] = find_delivery(cands["tracker"], geo, self.fps)
         from cricsense.passes.ball import prefer_precise
 
         d = found["tracker"] if prefer_precise(found["finder"], found["tracker"]) else found["finder"]
@@ -318,7 +428,8 @@ class ViewBallWorker(Worker):
         length = d.bounce.x
         cls = "yorker" if length < zones[0] else "full" if length < zones[1] else "good" if length < zones[2] else "short"
         info = {"length_m": round(length, 2), "line_m": round(d.bounce.y, 2), "length_class": cls,
-                "confirmed": bool(d.bounce.confirmed), "detections": len(d.track), "frames_in_shot": len(frames)}
+                "confirmed": bool(d.bounce.confirmed), "detections": len(d.track), "frames_in_shot": len(frames),
+                "release_t": round(d.release_t, 2), "speed_estimate_kph": d.speed_estimate_kph and round(d.speed_estimate_kph)}
         with self.state.lock:
             self.state.last_delivery = info
             self.state.bounces.append((length, d.bounce.y, cls, bool(d.bounce.confirmed)))
@@ -332,12 +443,15 @@ class ViewBallWorker(Worker):
         import torch
 
         kw = {"imgsz": self.imgsz, "conf": 0.1, "classes": [0], "verbose": False}
+        # half precision on the GPU: 51 ms a frame instead of 168, the same detections on 48 of 48
+        # test frames (RTX 5060 Laptop)
+        gpu = {"quantize": "fp16"} if str(self.device).startswith("cuda") else {}
         try:
-            return model.predict(images, device=self.device, **kw)
+            return model.predict(images, device=self.device, **kw, **gpu)
         except torch.OutOfMemoryError:
             torch.cuda.empty_cache()
         try:
-            return [model.predict(img, device=self.device, **kw)[0] for img in images]
+            return [model.predict(img, device=self.device, **kw, **gpu)[0] for img in images]
         except torch.OutOfMemoryError:
             torch.cuda.empty_cache()
             self.counts["cpu_fallback_batches"] = self.counts.get("cpu_fallback_batches", 0) + 1
@@ -390,11 +504,43 @@ BUFFER_S = 12.0  # a main-view delivery shot lasts 2-5 s, and is processed after
 LOOKBACK_FRAMES = 12  # the shot began a few frames before the worker noticed it
 CUT_DIFF = 28.0  # mean grey-level change between sampled thumbnails that marks a cut (normal motion ~10-15)
 BATCH = 2  # ball model batch: small enough beside another job on the GPU
+SHOT_FULL_EVERY = 3  # a shot's frames: a full camera match every this many, flow between
+AFTER_BOUNCE = 12  # frames past a confirmed bounce that end a shot's processing (the bat comes in ~0.3 s)
+EARLY_CHECK = 10  # calibrated frames between tries at finding the delivery so far
+
+
+class Window:
+    """The live overlay on screen as it is drawn: frames piped to ffplay (OpenCV here has no GUI).
+    Closing the window stops the showing, not the run."""
+
+    def __init__(self, w: int, h: int, fps: float) -> None:
+        self.proc = subprocess.Popen(
+            ["ffplay", "-loglevel", "error", "-window_title", "CricSense live", "-fflags", "nobuffer",
+             "-f", "rawvideo", "-pixel_format", "bgr24", "-video_size", f"{w}x{h}", "-framerate", f"{fps}", "-i", "-"],
+            stdin=subprocess.PIPE,
+        )  # fmt: skip
+
+    def show(self, frame) -> None:
+        if self.proc is None:
+            return
+        try:
+            self.proc.stdin.write(frame.tobytes())
+        except (BrokenPipeError, OSError):  # the window was closed
+            log.info("live window closed; the run goes on")
+            self.proc = None
+
+    def close(self) -> None:
+        if self.proc is not None:
+            try:
+                self.proc.stdin.close()
+            except OSError:
+                pass
+            self.proc.wait(timeout=10)
 
 
 def run_live(
     cfg: Config, source: str, out: Path | None, calibration_yaml: Path, seconds: float | None = None,
-    view_every: int = 2, realtime: bool = True,
+    view_every: int = 2, realtime: bool = True, show: bool = False,
 ) -> dict:
     cap = cv2.VideoCapture(source)
     if not cap.isOpened():
@@ -416,6 +562,7 @@ def run_live(
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    window = Window(w, h, fps) if show else None
     frame_id, drawn, late, max_lag, max_lag_t = 0, 0, 0, 0.0, 0.0
     score_every = max(1, int(round(fps / 2)))
     while True:
@@ -438,10 +585,14 @@ def run_live(
             score.offer((frame_id, t, image))
         if frame_id % view_every == 0:
             vb.offer((frame_id, t, image))
-        if writer is not None:
+        if writer is not None or window is not None:
             wall = time.perf_counter() - start
             stats = f"live  t {t:6.1f}s  wall {wall:6.1f}s  view+ball {vb.processed}/{frame_id // view_every + 1}"
-            writer.write(draw(image.copy(), state, wall, t, stats))
+            frame = draw(image.copy(), state, wall, t, stats)
+            if writer is not None:
+                writer.write(frame)
+            if window is not None:
+                window.show(frame)
             drawn += 1
         frame_id += 1
     play_wall = time.perf_counter() - start  # the source has been played; shots may still be processing
@@ -452,6 +603,8 @@ def run_live(
     cap.release()
     if writer is not None:
         writer.release()
+    if window is not None:
+        window.close()
     wall = time.perf_counter() - start
     by_kind: dict[str, list[float]] = {}
     for ev in state.events:

@@ -10,7 +10,7 @@ START ?=
 END   ?=
 export PYTORCH_CUDA_ALLOC_CONF := expandable_segments:True
 
-.PHONY: help doctor llm-check models say voices overs test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live db
+.PHONY: help doctor llm-check models say voices overs test clip run run-novoice check check-quick save-golden benchmark sheet scan coverage demo digits serve live live-plus db
 
 help:  ## list the commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -91,4 +91,8 @@ serve:  ## the HTTP API on http://localhost:8000/docs (make db first)
 
 live:  ## live mode on a clip:  make live CLIP=my_clip
 	@test -n "$(CLIP)" || (echo "usage: make live CLIP=name"; exit 2)
-	$(CS) live --video data/$(CLIP).mp4 --calibration configs/calibration/$(CLIP).yaml --out outputs/live/$(CLIP)_live.mp4
+	$(CS) live --video data/$(CLIP).mp4 --calibration configs/calibration/$(CLIP).yaml --out outputs/live/$(CLIP)_live.mp4 --show
+
+live-plus:  ## live with names over the players and a delivery card:  make live-plus CLIP=my_clip  (or VIDEO="Cricket match/x.mp4" CAL=configs/calibration/x.yaml)
+	@test -n "$(CLIP)$(VIDEO)" || (echo "usage: make live-plus CLIP=name  or  VIDEO=... CAL=..."; exit 2)
+	$(CS) live-plus --video "$(or $(VIDEO),data/$(CLIP).mp4)" --calibration $(or $(CAL),configs/calibration/$(CLIP).yaml)

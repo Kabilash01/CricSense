@@ -296,3 +296,28 @@ rendered overlay's sound matches the crowd track exactly (correlation 1.00), not
 The model is loaded from `models/demucs` (`make models`): demucs 4.1 fetches it from the Hugging
 Face hub by default, which stalled at 0 bytes here, while Meta's server (the file the hub copies)
 worked.
+
+## Live plus: players named live, the delivery card, speed (2026-10-28)
+
+`cricsense live-plus` (`make live-plus`) is live mode with a third worker: the players pass's
+detector and tracker on the newest main-view frame, roles from where the feet stand (the offline
+role assigner), names from the live score bar and the keeper from the match sheet. The picture is
+shown 1 s behind the source so boxes are drawn on the frame they were found on (or 1-5 frames
+later). Measured on Bumrah's over (5 min 20 s, RTX 5060 Laptop, nothing else on the GPU):
+- Every frame matched to the reference views cost 120-330 ms. The camera is now followed by optical
+  flow on a half-size copy (~10 ms), with a full match every 6 frames (`FlowCamera`). Against the
+  offline per-frame calibration, where players stand: 0.25 m median, 0.64 m at the 90th percentile.
+- The ball model analysing the last shot took the GPU from the players (their detector 360 ms a
+  frame instead of 35): it now waits while the main view is on screen and catches up between balls.
+- A shot's ball analysis took 25-66 s; now 8-15 s: FP16 (51 ms a frame at 1920 instead of 168, the
+  same detections on 48 of 48 frames), the camera by flow, and the shot left 12 frames after a
+  confirmed bounce (the fine-tuned model only from the release to there). Lengths against offline:
+  within 0.1 m on 5 of 6 deliveries (the sixth 3.3 vs 4.2 m), estimates 137-144 km/h against radar
+  137-142. Live mode (`cricsense live`) shares these changes.
+- Result over the whole over: kept pace (327 s for 320 s), every outcome 0.5 s after the bar
+  settled (6/6), radar 0.1 s, a bounce for each delivery 12-23 s after it, players named on the
+  main view (striker, non-striker, bowler, keeper, umpire as on the bar).
+- The score bar shows a ball's radar up to 4 s after its result (1.1: result 15.4 s, radar 19.7 s),
+  so a reading within 8 s of a result is that ball's; the first card version gave it to the next.
+Not live: the ball's path line (the delivery is found after its shot) and spoken commentary.
+Replays can add a second bounce for a ball; the card prefers the confirmed, earlier one.

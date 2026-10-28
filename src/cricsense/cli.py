@@ -108,6 +108,15 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--out", type=Path, help="write the live overlay here (mp4)")
     lv.add_argument("--seconds", type=float, help="stop after this much of the source")
     lv.add_argument("--fast", action="store_true", help="a file as fast as possible instead of at its own pace")
+    lv.add_argument("--show", action="store_true", help="show the live overlay in a window as it plays (needs ffplay)")
+    lp = add("live-plus", "live mode with the players named on screen and a delivery card (radar or estimated speed); shown in a window", _live_plus)
+    src = lp.add_mutually_exclusive_group(required=True)
+    src.add_argument("--video", type=Path, help="a file, played back at its own pace")
+    src.add_argument("--url", help="a stream (rtsp://, rtmp://, http://)")
+    lp.add_argument("--calibration", type=Path, required=True, help="the match's reference views (configs/calibration/<clip>.yaml)")
+    lp.add_argument("--out", type=Path, help="also write the overlay here (mp4)")
+    lp.add_argument("--seconds", type=float, help="stop after this much of the source")
+    lp.add_argument("--no-window", action="store_true", help="no window (with --out: only the file)")
     return parser
 
 
@@ -265,6 +274,32 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _live_plus(args: argparse.Namespace) -> int:
+    import os
+
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")  # a shared GPU fragments
+    from cricsense.config import load_config
+    from cricsense.io import setup_logging
+    from cricsense.live.plus import run_live_plus
+    from cricsense.live.runner import write_report
+
+    setup_logging()
+    cfg = load_config()
+    source = str(args.video) if args.video else args.url
+    report = run_live_plus(cfg, source, args.out, args.calibration, args.seconds, show=not args.no_window)
+    path = (args.out.parent if args.out else cfg.paths.output_dir / "live") / "live_plus_report.json"
+    write_report(report, path)
+    print(json.dumps({k: report[k] for k in ("source_seconds", "wall_seconds", "reader_late_frames", "workers")}, indent=1))
+    print(f"events: {len(report['events'])}; report: {path}")
+    if report["unfinished"]:
+        # a worker still on the GPU (the last shot's ball): leave without waiting for it, as
+        # tearing down a thread mid-CUDA call aborts the interpreter
+        print(f"stopped before {', '.join(report['unfinished'])} finished the last frames", flush=True)
+        sys.stdout.flush()
+        os._exit(0)
+    return 0
+
+
 def _live(args: argparse.Namespace) -> int:
     import os
 
@@ -276,7 +311,7 @@ def _live(args: argparse.Namespace) -> int:
     setup_logging()
     cfg = load_config()
     source = str(args.video) if args.video else args.url
-    report = run_live(cfg, source, args.out, args.calibration, args.seconds, realtime=not args.fast)
+    report = run_live(cfg, source, args.out, args.calibration, args.seconds, realtime=not args.fast, show=args.show)
     path = (args.out.parent if args.out else cfg.paths.output_dir / "live") / "live_report.json"
     write_report(report, path)
     print(json.dumps({k: report[k] for k in ("source_seconds", "wall_seconds", "reader_late_frames", "workers", "latency_s")}, indent=1))

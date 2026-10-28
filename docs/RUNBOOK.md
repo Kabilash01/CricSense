@@ -196,7 +196,17 @@ make db          # a local PostgreSQL for this project (no root)
 python -m cricsense publish --video-id <clip>    # a clip's results into the database
 make serve       # http://localhost:8000/docs - upload videos, read deliveries, scorecard, commentary
 make live CLIP=<clip>    # plays the clip as if live: score, outcomes and radar as they happen
+make live-plus CLIP=<clip>   # the same, plus the players named on screen and a delivery card
 ```
+
+`make live-plus` opens a window (1 s behind the source, so the boxes sit on the players): names
+over the striker, non-striker and bowler (from the score bar) and the keeper (match sheet), umpires
+and fielders marked, the score, and a card per ball - over, bowler -> striker, length and line
+when the bounce is found, the speed (radar from the bar, else our estimate "≈"), the outcome. A
+whole match from its start:
+`make live-plus VIDEO="Cricket match/<match>.mp4" CAL=configs/calibration/<a clip of it>.yaml`.
+Close the window or press Ctrl+C to stop. Needs the GPU on mains power: three models run at once.
+Not live: the ball's path line and spoken commentary (the full run, `make run`, has both).
 
 ---
 
