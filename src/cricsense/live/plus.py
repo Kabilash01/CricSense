@@ -27,7 +27,7 @@ import numpy as np
 import yaml
 
 from cricsense.config import Config
-from cricsense.live.runner import CUT_DIFF, BUFFER_S, FlowCamera, LiveState, ScoreWorker, ViewBallWorker, Window, Worker
+from cricsense.live.runner import CUT_DIFF, BUFFER_S, FlowCamera, LiveState, RefBank, ScoreWorker, ViewBallWorker, Window, Worker
 from cricsense.schema import Role
 
 log = logging.getLogger("cricsense.live")
@@ -53,20 +53,16 @@ class Person:  # what render.overlay draws for a player
 class PlayersWorker(Worker):
     """People on the newest main-view frame, with roles and names."""
 
-    def __init__(self, cfg: Config, state: LiveState, calibration_yaml: Path, fps: float, match_video: str) -> None:
+    def __init__(self, cfg: Config, state: LiveState, bank: RefBank, fps: float, match_video: str) -> None:
         super().__init__("players")
         from ultralytics import YOLO
 
-        from cricsense.calibration.camera_motion import CameraTracker, _shows_pitch, reference_images
-        from cricsense.calibration.homography import PitchHomography
+        from cricsense.calibration.camera_motion import _shows_pitch
         from cricsense.identity.match_sheet import load_sheet
-        from cricsense.io import read_yaml_doc
-        from cricsense.schema import CalibrationDoc
 
-        cal = read_yaml_doc(calibration_yaml, CalibrationDoc)
-        refs = reference_images(None, cal, cfg.root, cfg.video.resize)
-        refs = {v.name: (refs[v.name], PitchHomography(np.array(v.image_to_pitch))) for v in cal.views}
-        self.camera = FlowCamera(CameraTracker(refs, cfg.camera), cfg.camera.overlay_mask)
+        # the reference views it shares with the ball worker; when none matches (the light has
+        # moved on since the calibration's clip) each shot is calibrated from its creases
+        self.camera = FlowCamera(bank, cfg.camera, creases=True)
         self.shows_pitch = lambda img: _shows_pitch(img, cfg.camera.gate_min_pitch or 0.03)
         self.occluders = list(cfg.camera.overlay_mask)
         det = cfg.players["detector"]
@@ -295,7 +291,7 @@ def run_live_plus(
     match_video = yaml.safe_load(Path(calibration_yaml).read_text()).get("video_id") or Path(str(source)).stem
     score = ScoreWorker(cfg, state, 0.0, match_video)
     vb = ViewBallWorker(cfg, state, 0.0, calibration_yaml, fps, cfg.device, buffer)
-    players = PlayersWorker(cfg, state, calibration_yaml, fps, match_video)
+    players = PlayersWorker(cfg, state, vb.bank, fps, match_video)
     vb.gate = players.yield_gpu
     workers = [score, vb, players]
     start = time.perf_counter()  # the clock starts once the models are loaded

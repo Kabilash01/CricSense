@@ -176,33 +176,105 @@ class ScoreWorker(Worker):
             self.last = fresh[-1]
 
 
+class RefBank:
+    """The match's reference views, shared by the live workers: the calibration's, plus views
+    found live from the painted creases (FlowCamera with creases), the newest MAX_LIVE kept.
+    A reference matches the broadcast for minutes, not hours - the shadows and the grass move: a
+    view from 51 minutes into the final matched 1 of 291 main-camera frames of its first 5 minutes,
+    one from 2 minutes earlier 222-405 points on the same frame."""
+
+    MAX_LIVE = 4
+
+    def __init__(self, refs: dict) -> None:
+        self._refs = dict(refs)
+        self._live: deque = deque()
+        self.version = 0
+        self.lock = threading.Lock()
+
+    def get(self) -> tuple[dict, int]:
+        with self.lock:
+            return dict(self._refs), self.version
+
+    def add(self, image: np.ndarray, homography) -> None:
+        with self.lock:
+            self.version += 1
+            name = f"live_{self.version}"
+            self._refs[name] = (image, homography)
+            self._live.append(name)
+            while len(self._live) > self.MAX_LIVE:
+                del self._refs[self._live.popleft()]
+
+
+STRIP_MIN = 0.25  # share of the frame above the score bar in the pitch's colour: the main view's
+#                   strip (0.31-0.54 on the final), not a fielding, crowd or outfield shot (0.00-0.09)
+
+
+def shows_strip(image: np.ndarray) -> bool:
+    """The pitch strip fills enough of the frame to look for its creases (~2 ms)."""
+    from cricsense.calibration.auto import pitch_colour
+
+    small = cv2.resize(image, None, fx=0.25, fy=0.25, interpolation=cv2.INTER_AREA)
+    return float((pitch_colour(small)[: int(0.85 * small.shape[0])] > 0).mean()) >= STRIP_MIN
+
+
 class FlowCamera:
     """A frame's image -> pitch homography, fast enough for live: the last one carried by the
     camera's motion since it (optical flow on a half-size copy, ~10 ms), refreshed by a full match
     against the reference views (CameraTracker, 40-330 ms) every `full_every` frames. A refresh can
     fail when the camera has zoomed in on the batter (too little of the reference view left): then
     the flow goes on carrying it, for up to `max_flow` frames since the last full match. After a
-    failed match with nothing to carry (an outfield view, a replay) it waits `miss_wait` frames
-    before trying again. Measured on Bumrah's over against the offline per-frame calibration, where
-    players stand: 0.25 m median, 0.64 m at the 90th percentile; offline 237 frames, this 253."""
+    failed match with nothing to carry it waits `miss_wait` frames before trying again; frames
+    without the pitch strip on screen (outfield, crowd, close-ups) are never matched. Measured on
+    Bumrah's over against the offline per-frame calibration, where players stand: 0.25 m median,
+    0.64 m at the 90th percentile; offline 237 frames, this 253.
+
+    With `creases`, a main view no reference matches is calibrated from its painted creases
+    (0.3-0.5 s): a reference view matches the broadcast for minutes, not hours, so a whole match
+    cannot rely on one clip's calibration. As offline, one strong calibration is not enough - a
+    batter on a crease can fool it: it is carried by the flow until a second strong one, a few
+    frames on, puts the creases within AGREE_PX of it; then it is used, and joins the bank."""
 
     SCALE = 0.5
+    CREASE_EVERY = 3  # frames between crease calibrations while none is confirmed
+    CREASE_TRIES = 4  # per camera shot: a delivery's wide view calibrates at once; replays and
+    #                   close-ups of the pitch (which also show the strip) never do
+    AGREE_PX = 20.0
+    CORNERS = np.array([[1.22, -1.32, 1.0], [1.22, 1.32, 1.0], [18.9, -1.32, 1.0], [18.9, 1.32, 1.0]]).T  # popping creases
 
-    def __init__(self, tracker, occluders, full_every: int = 6, max_flow: int = 60, miss_wait: int = 4) -> None:
-        self.tracker, self.occluders = tracker, list(occluders)
+    def __init__(
+        self, bank: RefBank, opts, full_every: int = 6, max_flow: int = 60, miss_wait: int = 4, creases: bool = False
+    ) -> None:
+        self.bank, self.opts, self.occluders = bank, opts, list(opts.overlay_mask)
         self.full_every, self.max_flow, self.miss_wait = full_every, max_flow, miss_wait
+        self.creases = creases
         self.mask: np.ndarray | None = None
+        self.tracker = None
+        self.version = -1
         self.counts = {"full_matches": 0, "full_failed": 0, "flow_failed": 0}
         self.reset()
 
+    def _tracker(self):
+        """The camera tracker on the bank's current references (rebuilt when views were added)."""
+        from cricsense.calibration.camera_motion import CameraTracker
+
+        refs, version = self.bank.get()
+        if version != self.version:
+            self.tracker, self.version = CameraTracker(refs, self.opts), version
+        return self.tracker
+
     def reset(self) -> None:
         """A cut: nothing carries over."""
-        self.tracker.reset()
+        if self.tracker is not None:
+            self.tracker.reset()
         self.H: np.ndarray | None = None
         self.prev: np.ndarray | None = None
         self.since_full = 0  # frames since the last successful full match
         self.since_try = 0  # frames since the last full match tried
         self.wait = 0
+        self.refs_failed = False  # this shot's references did not match: go to the creases
+        self.candidate: np.ndarray | None = None  # a strong crease calibration awaiting a second
+        self.since_crease = self.CREASE_EVERY
+        self.crease_tries = 0
 
     def __call__(self, image: np.ndarray, in_view: bool = True) -> np.ndarray | None:
         """This frame's homography, or None. in_view=False (no pitch on screen): None, but the
@@ -214,30 +286,73 @@ class FlowCamera:
 
     def _homography(self, image: np.ndarray, small: np.ndarray, prev: np.ndarray | None) -> np.ndarray | None:
         flow_H = None
-        if self.H is not None and prev is not None:
+        if (self.H is not None or self.candidate is not None) and prev is not None:
             M = self._flow(prev, small)
-            if M is not None:
-                flow_H = self.H @ np.linalg.inv(M)
-            else:
+            if M is None:
                 self.counts["flow_failed"] += 1
+                self.candidate = None
+            else:
+                Minv = np.linalg.inv(M)
+                flow_H = None if self.H is None else self.H @ Minv
+                if self.candidate is not None:
+                    self.candidate = self.candidate @ Minv
         self.since_full += 1
         self.since_try += 1
+        self.since_crease += 1
         if flow_H is not None and self.since_try < self.full_every:
             return flow_H
         if flow_H is None and self.wait > 0:
             self.wait -= 1
             return None
-        est = self.tracker.estimate(image)
-        self.counts["full_matches"] += 1
-        self.since_try = 0  # failed while the flow carries on: the next try is full_every frames on
-        if est.homography is not None:
-            self.since_full = 0
-            return est.homography.H
-        self.counts["full_failed"] += 1
+        if not shows_strip(image):  # no pitch strip on screen: nothing to match (a full match costs 50-300 ms)
+            self.counts["no_strip"] = self.counts.get("no_strip", 0) + 1
+            return flow_H if self.since_full < self.max_flow else None
+        if not self.refs_failed:
+            est = self._tracker().estimate(image)
+            self.counts["full_matches"] += 1
+            self.since_try = 0  # failed while the flow carries on: the next try is full_every frames on
+            if est.homography is not None:
+                self.since_full = 0
+                return est.homography.H
+            self.counts["full_failed"] += 1
+            self.refs_failed = self.creases  # with creases, once a shot: they are slower to fail than to replace
         if flow_H is not None and self.since_full < self.max_flow:
             return flow_H
-        self.wait = self.miss_wait
+        if self.creases and self.since_crease >= self.CREASE_EVERY and (self.crease_tries < self.CREASE_TRIES or self.candidate is not None):
+            self.since_crease = 0
+            self.crease_tries += 1
+            H = self._from_creases(image)
+            if H is not None:
+                self.since_full = self.since_try = 0
+                return H
+            return None
+        if not self.creases:
+            self.wait = self.miss_wait
         return None
+
+    def _from_creases(self, image: np.ndarray) -> np.ndarray | None:
+        from cricsense.calibration.auto import STRONG, calibrate
+        from cricsense.calibration.homography import PitchHomography
+
+        self.counts["crease_tries"] = self.counts.get("crease_tries", 0) + 1
+        c = calibrate(image)
+        if c is None or c.score < STRONG:
+            return None
+        H = c.image_to_pitch
+        if self.candidate is not None and self._agree(H, self.candidate):
+            self.candidate = None
+            self.bank.add(image, PitchHomography(H))
+            self.counts["crease_views"] = self.counts.get("crease_views", 0) + 1
+            return H
+        self.candidate = H
+        return None
+
+    def _agree(self, a: np.ndarray, b: np.ndarray) -> bool:
+        """The popping creases' corners, drawn by both homographies, within AGREE_PX."""
+        pa, pb = np.linalg.inv(a) @ self.CORNERS, np.linalg.inv(b) @ self.CORNERS
+        if np.any(pa[2] <= 0) or np.any(pb[2] <= 0):
+            return False
+        return float(np.max(np.linalg.norm(pa[:2] / pa[2] - pb[:2] / pb[2], axis=0))) <= self.AGREE_PX
 
     def _flow(self, prev: np.ndarray, cur: np.ndarray) -> np.ndarray | None:
         """Previous -> current frame homography in full-size pixels, from tracked corners (the
@@ -271,17 +386,15 @@ class ViewBallWorker(Worker):
         self.buffer = buffer  # the reader's last few seconds of frames: (frame_id, t, image)
         import os
 
-        from cricsense.calibration.camera_motion import CameraTracker, _shows_pitch, reference_images
+        from cricsense.calibration.camera_motion import _shows_pitch, reference_images
         from cricsense.calibration.homography import PitchHomography
         from cricsense.io import read_yaml_doc
         from cricsense.schema import CalibrationDoc
 
         cal = read_yaml_doc(calibration_yaml, CalibrationDoc)
         refs = reference_images(None, cal, cfg.root, cfg.video.resize)
-        self.refs = {v.name: (refs[v.name], PitchHomography(np.array(v.image_to_pitch))) for v in cal.views}
+        self.bank = RefBank({v.name: (refs[v.name], PitchHomography(np.array(v.image_to_pitch))) for v in cal.views})
         self.camera_opts = cfg.camera
-        self.new_tracker = lambda: CameraTracker(self.refs, self.camera_opts)
-        self.tracker = self.new_tracker()
         self.shows_pitch = lambda img: _shows_pitch(img, cfg.camera.gate_min_pitch or 0.03)
         os.environ.setdefault("YOLO_AUTOINSTALL", "false")
         from ultralytics import YOLO
@@ -315,17 +428,19 @@ class ViewBallWorker(Worker):
                 self._queue_shot(self.shot_start, frame_id - 1)
                 self.shot_start = None
             return
-        if pitch:
-            self.tracker.reset()
-            est = self.tracker.estimate(image)
-            if est.homography is not None:
-                self.counts["main_view_frames"] += 1
-                self.shot_start = frame_id
+        # a main-view shot starts: the pitch strip fills the frame (main view 0.31-0.54 of it, other
+        # shots 0.00-0.09). Not a reference match: those fail an hour from the calibration's clip;
+        # the shot is calibrated when it is processed (_close_shot, from its creases if need be)
+        if pitch and shows_strip(image):
+            self.shot_start = frame_id
 
     def _queue_shot(self, f0: int, f1: int) -> None:
         """Copy the shot's frames out of the buffer (it moves on) and hand them to the shot
         thread, so noticing the next shot never waits for processing this one."""
         self.counts["shots"] += 1
+        if f1 - f0 < MIN_SHOT_FRAMES:  # a glimpse of the strip (a replay, a close-up), not a delivery
+            self.counts["too_short"] = self.counts.get("too_short", 0) + 1
+            return
         # the shot began a little before it was noticed: take the buffered frames since then
         frames = [(f, img) for f, _, img in list(self.buffer) if f0 - LOOKBACK_FRAMES <= f <= f1]
         if len(frames) < 8:
@@ -366,7 +481,7 @@ class ViewBallWorker(Worker):
         # is in the first seconds (run-up, release, bounce, bat): once a confirmed bounce is
         # AFTER_BOUNCE frames behind, the rest of the shot is left. The fine-tuned model then runs
         # only from the release to there.
-        camera = FlowCamera(self.new_tracker(), self.camera_opts.overlay_mask, full_every=SHOT_FULL_EVERY)
+        camera = FlowCamera(self.bank, self.camera_opts, full_every=SHOT_FULL_EVERY, creases=True)
         calibrated, geo, pending = [], {}, []
         cands: dict[str, list] = {"finder": [], "tracker": []}
 
@@ -505,6 +620,7 @@ LOOKBACK_FRAMES = 12  # the shot began a few frames before the worker noticed it
 CUT_DIFF = 28.0  # mean grey-level change between sampled thumbnails that marks a cut (normal motion ~10-15)
 BATCH = 2  # ball model batch: small enough beside another job on the GPU
 SHOT_FULL_EVERY = 3  # a shot's frames: a full camera match every this many, flow between
+MIN_SHOT_FRAMES = 50  # a delivery's main-view shot lasts 2.4-6 s (73-152 frames on Bumrah's over)
 AFTER_BOUNCE = 12  # frames past a confirmed bounce that end a shot's processing (the bat comes in ~0.3 s)
 EARLY_CHECK = 10  # calibrated frames between tries at finding the delivery so far
 
@@ -515,7 +631,8 @@ class Window:
 
     def __init__(self, w: int, h: int, fps: float) -> None:
         self.proc = subprocess.Popen(
-            ["ffplay", "-loglevel", "error", "-window_title", "CricSense live", "-fflags", "nobuffer",
+            # -autoexit: close the window at the end of the frames (ffplay otherwise keeps it open)
+            ["ffplay", "-loglevel", "error", "-autoexit", "-window_title", "CricSense live", "-fflags", "nobuffer",
              "-f", "rawvideo", "-pixel_format", "bgr24", "-video_size", f"{w}x{h}", "-framerate", f"{fps}", "-i", "-"],
             stdin=subprocess.PIPE,
         )  # fmt: skip
@@ -535,7 +652,11 @@ class Window:
                 self.proc.stdin.close()
             except OSError:
                 pass
-            self.proc.wait(timeout=10)
+            try:
+                self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:  # still showing: close it, the run is over
+                self.proc.terminate()
+                self.proc.wait(timeout=5)
 
 
 def run_live(

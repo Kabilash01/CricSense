@@ -321,3 +321,22 @@ later). Measured on Bumrah's over (5 min 20 s, RTX 5060 Laptop, nothing else on 
   so a reading within 8 s of a result is that ball's; the first card version gave it to the next.
 Not live: the ball's path line (the delivery is found after its shot) and spoken commentary.
 Replays can add a second bounce for a ball; the card prefers the confirmed, earlier one.
+
+## Live plus on a whole match: calibrating from the creases (2026-10-29)
+
+On the whole final, live-plus named no one: a camera reference matches the broadcast for minutes,
+not hours (shadows and grass move). Measured on the first 5 minutes: the 51-minute clip's views
+matched 1 of 291 main-camera frames, a 15-minute one 1, one from 2 minutes earlier 222-405 points
+on the same frame (needs 80). Now:
+- a shot starts on the pitch strip (pale-brown share of the frame: main view 0.31-0.54, fielding,
+  crowd and outfield 0.00-0.09; `shows_strip`), not on a reference match; shots under 2 s are left
+- references are tried once per shot; then the shot is calibrated from its painted creases
+  (0.3-0.5 s), confirmed by a second strong calibration a few frames on within 20 px (as offline,
+  one frame can be fooled by a batter on a crease), carried by optical flow, and added to the
+  shared reference bank; at most 4 tries per shot (replays and pitch close-ups never calibrate)
+Result, first 7 minutes on mains power: kept pace (424.6 s for 420), every ball's card, radar and
+outcome; players named on 156 frames (was 0) - on about half the deliveries, for 1-2 s of the
+run-up each (0.6 and 1.3 fully: striker, non-striker, bowler, keeper, umpire), none on 1.1 and 1.2;
+roles can be wrong right after a shot, when everyone runs. On battery it fell behind (665 s).
+An over with its own calibration (Bumrah's) is named throughout. Not solved: a reliable camera per
+frame over a whole match in real time.

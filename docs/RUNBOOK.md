@@ -206,6 +206,10 @@ when the bounce is found, the speed (radar from the bar, else our estimate "≈"
 whole match from its start:
 `make live-plus VIDEO="Cricket match/<match>.mp4" CAL=configs/calibration/<a clip of it>.yaml`.
 Close the window or press Ctrl+C to stop. Needs the GPU on mains power: three models run at once.
+On a whole match the camera is calibrated from the creases at each delivery: the card, score and
+radar work throughout, the names show on about half the deliveries for 1-2 s (docs/decisions.md);
+an over with its own calibration (`make clip` + `make run`, then `make live-plus CLIP=...`) is
+named throughout.
 Not live: the ball's path line and spoken commentary (the full run, `make run`, has both).
 
 ---
